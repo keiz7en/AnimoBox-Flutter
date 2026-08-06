@@ -1,0 +1,31 @@
+# Flutter
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+.metadata
+
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties
+android/key.properties
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated
+**/GeneratedPluginRegistrant.java
+**/GeneratedPluginRegistrant.kt
+
+# APK output (release only)
+*.apk
+*.aab

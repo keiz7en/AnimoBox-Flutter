@@ -1,0 +1,148 @@
+class Anime {
+  final int id;
+  final String title;
+  final String englishTitle;
+  final String romajiTitle;
+  final String coverImage;
+  final String bannerImage;
+  final String description;
+  final String format;
+  final String status;
+  final int episodes;
+  final int duration;
+  final double score;
+  final List<String> genres;
+  final String season;
+  final int? nextAiringEpisode;
+  final int? airingAt;
+  final int? airingInterval;
+  final bool isAdult;
+  final List<String> synonyms;
+
+  Anime({
+    required this.id,
+    required this.title,
+    this.englishTitle = '',
+    this.romajiTitle = '',
+    required this.coverImage,
+    this.bannerImage = '',
+    this.description = '',
+    this.format = '',
+    this.status = '',
+    this.episodes = 0,
+    this.duration = 0,
+    this.score = 0,
+    this.genres = const [],
+    this.season = '',
+    this.nextAiringEpisode,
+    this.airingAt,
+    this.airingInterval,
+    this.isAdult = false,
+    this.synonyms = const [],
+  });
+
+  factory Anime.fromAniList(Map<String, dynamic> json) {
+    final titleObj = json['title'] ?? {};
+    final coverObj = json['coverImage'] ?? {};
+    final bannerObj = json['bannerImage'] ?? {};
+
+    int? nextEp;
+    int? airAt;
+    int? interval;
+
+    final nextAiring = json['nextAiringEpisode'];
+    if (nextAiring is Map<String, dynamic>) {
+      nextEp = nextAiring['episode'] as int?;
+      airAt = nextAiring['airingAt'] as int?;
+    }
+
+    return Anime(
+      id: json['id'] ?? 0,
+      title: titleObj['native'] ?? titleObj['romaji'] ?? '',
+      englishTitle: titleObj['english'] ?? '',
+      romajiTitle: titleObj['romaji'] ?? '',
+      coverImage: coverObj['large'] ?? coverObj['medium'] ?? '',
+      bannerImage: bannerObj is String ? bannerObj : (bannerObj['large'] ?? ''),
+      description: (json['description'] ?? '').replaceAll(RegExp(r'<[^>]*>'), ''),
+      format: (json['format'] ?? '').toString().replaceAll('_', ' '),
+      status: json['status'] ?? '',
+      episodes: json['episodes'] ?? 0,
+      duration: json['duration'] ?? 0,
+      score: (json['averageScore'] ?? 0).toDouble(),
+      genres: List<String>.from(json['genres'] ?? []),
+      season: json['season'] ?? '',
+      nextAiringEpisode: nextEp,
+      airingAt: airAt,
+      airingInterval: interval,
+      isAdult: json['isAdult'] ?? false,
+      synonyms: List<String>.from(json['synonyms'] ?? []),
+    );
+  }
+
+  String get displayTitle {
+    if (englishTitle.isNotEmpty) return englishTitle;
+    if (romajiTitle.isNotEmpty) return romajiTitle;
+    return title;
+  }
+
+  String get searchTitle {
+    if (englishTitle.isNotEmpty) return englishTitle;
+    return romajiTitle.isNotEmpty ? romajiTitle : title;
+  }
+
+  List<String> get allTitles {
+    final titles = <String>{};
+    if (englishTitle.isNotEmpty) titles.add(englishTitle);
+    if (romajiTitle.isNotEmpty) titles.add(romajiTitle);
+    if (title.isNotEmpty) titles.add(title);
+    titles.addAll(synonyms);
+    return titles.toList();
+  }
+}
+
+class Episode {
+  final int number;
+  final String title;
+  final String? thumbnail;
+  final String? description;
+  final int? airingAt;
+
+  Episode({
+    required this.number,
+    this.title = '',
+    this.thumbnail,
+    this.description,
+    this.airingAt,
+  });
+}
+
+class StreamServer {
+  final String name;
+  final String? subUrl;
+  final String? dubUrl;
+
+  StreamServer({required this.name, this.subUrl, this.dubUrl});
+}
+
+class StreamLink {
+  final String url;
+  final String quality;
+
+  StreamLink({required this.url, this.quality = 'auto'});
+}
+
+class StreamSource {
+  final String server;
+  final String type;
+  final List<StreamLink> links;
+
+  StreamSource({required this.server, required this.type, required this.links});
+}
+
+class SearchResult {
+  final String id;
+  final String title;
+  final String source;
+
+  SearchResult({required this.id, required this.title, required this.source});
+}
