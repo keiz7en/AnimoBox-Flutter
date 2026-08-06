@@ -559,7 +559,9 @@ class _UpdateDialog extends StatefulWidget {
 
 class _UpdateDialogState extends State<_UpdateDialog> {
   bool _downloading = false;
+  bool _installing = false;
   double _progress = 0;
+  String _filePath = '';
 
   String _formatSize(int? bytes) {
     if (bytes == null) return '';
@@ -574,8 +576,8 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     try {
       final dir = await getExternalStorageDirectory();
       if (dir == null) throw Exception('No storage');
-      final filePath = '${dir.path}/AnimoBox-${widget.latestVersion}.apk';
-      final file = File(filePath);
+      _filePath = '${dir.path}/AnimoBox-${widget.latestVersion}.apk';
+      final file = File(_filePath);
       final request = http.Request('GET', Uri.parse(widget.apkUrl!));
       final response = await http.Client().send(request);
       final contentLength = response.contentLength ?? 0;
@@ -590,19 +592,37 @@ class _UpdateDialogState extends State<_UpdateDialog> {
       }
       await sink.close();
       if (mounted) {
-        setState(() { _downloading = false; _progress = 1; });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Downloaded: AnimoBox-${widget.latestVersion}.apk'),
-          action: SnackBarAction(label: 'Install', textColor: NipahColors.gold, onPressed: () async {
-            final f = File(filePath);
-            if (await f.exists()) await launchUrl(Uri.file(filePath), mode: LaunchMode.externalApplication);
-          }),
-        ));
+        setState(() { _downloading = false; _installing = true; _progress = 1; });
+        await _installApk();
       }
     } catch (e) {
       if (mounted) {
         setState(() => _downloading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e'), backgroundColor: NipahColors.danger));
+      }
+    }
+  }
+
+  Future<void> _installApk() async {
+    try {
+      final file = File(_filePath);
+      if (await file.exists()) {
+        await launchUrl(Uri.file(_filePath), mode: LaunchMode.externalApplication);
+      }
+      if (mounted) {
+        setState(() => _installing = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Opening installer...'),
+          backgroundColor: NipahColors.success,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _installing = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Install failed: $e'),
+          backgroundColor: NipahColors.danger,
+        ));
       }
     }
   }
@@ -637,22 +657,26 @@ class _UpdateDialogState extends State<_UpdateDialog> {
               child: SingleChildScrollView(child: Text(widget.releaseNotes, style: NipahTheme.body(size: 12, color: NipahColors.textSoft))),
             ),
           ],
-          if (_downloading) ...[
+          if (_downloading || _installing) ...[
             const SizedBox(height: 16),
             LinearProgressIndicator(value: _progress > 0 ? _progress : null,
               backgroundColor: NipahColors.surface2, valueColor: AlwaysStoppedAnimation<Color>(NipahColors.gold), minHeight: 4),
             const SizedBox(height: 8),
-            Text('${(_progress * 100).toStringAsFixed(0)}%', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
+            Text(
+              _installing ? 'Opening installer...' : '${(_progress * 100).toStringAsFixed(0)}%',
+              style: NipahTheme.body(size: 11, color: NipahColors.textDim),
+            ),
           ],
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context),
+        TextButton(onPressed: (_downloading || _installing) ? null : () => Navigator.pop(context),
           child: Text(widget.hasUpdate ? 'Later' : 'OK', style: NipahTheme.body(color: NipahColors.textDim))),
         if (widget.hasUpdate && widget.apkUrl != null)
           TextButton(
-            onPressed: _downloading ? null : _downloadApk,
-            child: Text(_downloading ? 'Downloading...' : 'Download',
+            onPressed: (_downloading || _installing) ? null : _downloadApk,
+            child: Text(
+              _installing ? 'Installing...' : _downloading ? 'Downloading...' : 'Download & Install',
               style: NipahTheme.label(size: 11, color: NipahColors.gold)),
           ),
       ],
