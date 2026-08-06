@@ -43,7 +43,6 @@ class _WatchPageState extends State<WatchPage> {
   Timer? _positionSaveTimer;
   bool _historySaved = false;
   Duration _savedPosition = Duration.zero;
-  bool _hasResumedPosition = false;
   bool _showResumeDialog = false;
 
   String get _positionKey => '${widget.anilistId}_ep${widget.episode}';
@@ -77,7 +76,11 @@ class _WatchPageState extends State<WatchPage> {
       }
     });
 
-    _loadSavedPosition();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadSavedPosition();
     _loadStream();
   }
 
@@ -140,13 +143,13 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   void _resumeFromPosition() {
+    setState(() {
+      _showResumeDialog = false;
+    });
     if (_savedPosition.inSeconds > 0) {
       _player.seek(_savedPosition);
     }
-    setState(() {
-      _showResumeDialog = false;
-      _hasResumedPosition = true;
-    });
+    _player.play();
     _startPositionSaveTimer();
   }
 
@@ -154,8 +157,8 @@ class _WatchPageState extends State<WatchPage> {
     clearPlaybackPosition(_positionKey);
     setState(() {
       _showResumeDialog = false;
-      _hasResumedPosition = true;
     });
+    _player.play();
     _startPositionSaveTimer();
   }
 
@@ -255,18 +258,24 @@ class _WatchPageState extends State<WatchPage> {
       await _player.open(
         Media(url, httpHeaders: headers),
       );
-      setState(() {
-        _isInitializing = false;
-        _isPlaying = true;
-        _showControls = true;
-      });
-      _resetHideTimer();
-      _saveWatchHistory();
-      if (!_showResumeDialog && _savedPosition.inSeconds > 0 && !_hasResumedPosition) {
-        _resumeFromPosition();
-      } else if (!_showResumeDialog && !_hasResumedPosition) {
+
+      if (_showResumeDialog) {
+        await _player.pause();
+        setState(() {
+          _isInitializing = false;
+          _isPlaying = false;
+          _showControls = true;
+        });
+      } else {
+        setState(() {
+          _isInitializing = false;
+          _isPlaying = true;
+          _showControls = true;
+        });
         _startPositionSaveTimer();
       }
+      _resetHideTimer();
+      _saveWatchHistory();
     } catch (e) {
       setState(() {
         _isInitializing = false;

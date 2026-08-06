@@ -574,9 +574,14 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     if (widget.apkUrl == null) return;
     setState(() { _downloading = true; _progress = 0; });
     try {
-      final dir = await getExternalStorageDirectory();
-      if (dir == null) throw Exception('No storage');
-      _filePath = '${dir.path}/AnimoBox-${widget.latestVersion}.apk';
+      String dirPath;
+      try {
+        final dir = await getExternalStorageDirectory();
+        dirPath = dir?.path ?? (await getApplicationDocumentsDirectory()).path;
+      } catch (_) {
+        dirPath = (await getApplicationDocumentsDirectory()).path;
+      }
+      _filePath = '$dirPath/AnimoBox-${widget.latestVersion}.apk';
       final file = File(_filePath);
       final request = http.Request('GET', Uri.parse(widget.apkUrl!));
       final response = await http.Client().send(request);
