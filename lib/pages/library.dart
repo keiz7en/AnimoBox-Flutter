@@ -268,7 +268,7 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
 
   Widget _buildLoadingState() {
     return const Center(
-      child: const NipahLoader(size: 28),
+      child: NipahLoader(size: 28),
     );
   }
 

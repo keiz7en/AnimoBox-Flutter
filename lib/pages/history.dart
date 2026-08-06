@@ -105,7 +105,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Widget _buildLoading() {
     return const Center(
-      child: const NipahLoader(size: 28),
+      child: NipahLoader(size: 28),
     );
   }
 

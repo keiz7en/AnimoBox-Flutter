@@ -53,7 +53,7 @@ Future<List<Anime>> _fetchAniList({
     if (status != null) variables['status'] = status;
     if (search != null) variables['search'] = search;
 
-    final query = '''
+    const query = '''
       query (\$page: Int, \$perPage: Int, \$sort: [MediaSort], \$status: MediaStatus, \$search: String) {
         Page(page: \$page, perPage: \$perPage) {
           media(search: \$search, sort: \$sort, status: \$status, type: ANIME, isAdult: false) {

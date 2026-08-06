@@ -1,13 +1,266 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:open_file/open_file.dart';
 import '../api.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
+
+const Map<String, Map<String, String>> translations = {
+  'English': {
+    'settings': 'Settings',
+    'general': 'General',
+    'player': 'Player',
+    'data': 'Data',
+    'about': 'About',
+    'checkUpdate': 'Check for Update',
+    'tapToCheck': 'Tap to check latest version',
+    'appearance': 'APPEARANCE',
+    'language': 'Language',
+    'theme': 'Theme',
+    'accentColor': 'Accent Color',
+    'content': 'CONTENT',
+    'nsfwFilter': 'Show NSFW Content',
+    'nsfwSubtitle': 'Show adult-rated anime',
+    'playback': 'PLAYBACK',
+    'autoRotate': 'Auto Rotate',
+    'autoRotateSub': 'Rotate to landscape during playback',
+    'videoQuality': 'Video Quality',
+    'videoQualitySub': 'Preferred stream quality',
+    'preferredPlayer': 'Preferred Player',
+    'preferredPlayerSub': 'Choose video player',
+    'playerEngine': 'Player Engine',
+    'storage': 'STORAGE',
+    'clearCache': 'Clear Cache',
+    'clearCacheSub': 'Remove temporary files',
+    'clearHistory': 'Clear Watch History',
+    'clearHistorySub': 'Remove all watched episodes',
+    'clearAllData': 'Clear All Data',
+    'clearAllDataSub': 'Remove library, history, and settings',
+    'links': 'LINKS',
+    'sourceCode': 'Source Code',
+    'reportIssue': 'Report Issue',
+    'libraries': 'LIBRARIES',
+    'appInfo': 'APP',
+    'updateAvailable': 'Update Available',
+    'upToDate': "You're Up to Date",
+    'releaseNotes': 'Release Notes:',
+    'downloadInstall': 'Download & Install',
+    'downloading': 'Downloading...',
+    'installing': 'Opening installer...',
+    'later': 'Later',
+    'ok': 'OK',
+    'cancel': 'Cancel',
+    'resumeFrom': 'Resume from?',
+    'startOver': 'Start Over',
+    'resume': 'Resume',
+    'episode': 'Episode',
+  },
+  'Español': {
+    'settings': 'Configuración',
+    'general': 'General',
+    'player': 'Reproductor',
+    'data': 'Datos',
+    'about': 'Acerca de',
+    'checkUpdate': 'Buscar Actualización',
+    'tapToCheck': 'Toca para verificar la última versión',
+    'appearance': 'APARIENCIA',
+    'language': 'Idioma',
+    'theme': 'Tema',
+    'accentColor': 'Color de Acento',
+    'content': 'CONTENIDO',
+    'nsfwFilter': 'Mostrar Contenido NSFW',
+    'nsfwSubtitle': 'Mostrar anime para adultos',
+    'playback': 'REPRODUCCIÓN',
+    'autoRotate': 'Rotación Automática',
+    'autoRotateSub': 'Rotar a horizontal durante la reproducción',
+    'videoQuality': 'Calidad de Video',
+    'videoQualitySub': 'Calidad de transmisión preferida',
+    'preferredPlayer': 'Reproductor Preferido',
+    'preferredPlayerSub': 'Elegir reproductor de video',
+    'playerEngine': 'Motor del Reproductor',
+    'storage': 'ALMACENAMIENTO',
+    'clearCache': 'Limpiar Caché',
+    'clearCacheSub': 'Eliminar archivos temporales',
+    'clearHistory': 'Limpiar Historial',
+    'clearHistorySub': 'Eliminar todos los episodios vistos',
+    'clearAllData': 'Limpiar Todos los Datos',
+    'clearAllDataSub': 'Eliminar biblioteca, historial y configuración',
+    'links': 'ENLACES',
+    'sourceCode': 'Código Fuente',
+    'reportIssue': 'Reportar Problema',
+    'libraries': 'BIBLIOTECAS',
+    'appInfo': 'APP',
+    'updateAvailable': 'Actualización Disponible',
+    'upToDate': 'Estás al Día',
+    'releaseNotes': 'Notas de la Versión:',
+    'downloadInstall': 'Descargar e Instalar',
+    'downloading': 'Descargando...',
+    'installing': 'Abriendo instalador...',
+    'later': 'Después',
+    'ok': 'OK',
+    'cancel': 'Cancelar',
+    'resumeFrom': '¿Reanudar desde?',
+    'startOver': 'Empezar de Nuevo',
+    'resume': 'Reanudar',
+    'episode': 'Episodio',
+  },
+  'Português': {
+    'settings': 'Configurações',
+    'general': 'Geral',
+    'player': 'Reprodutor',
+    'data': 'Dados',
+    'about': 'Sobre',
+    'checkUpdate': 'Verificar Atualização',
+    'tapToCheck': 'Toque para verificar a versão mais recente',
+    'appearance': 'APARÊNCIA',
+    'language': 'Idioma',
+    'theme': 'Tema',
+    'accentColor': 'Cor de Destaque',
+    'content': 'CONTEÚDO',
+    'nsfwFilter': 'Mostrar Conteúdo NSFW',
+    'nsfwSubtitle': 'Mostrar anime para adultos',
+    'playback': 'REPRODUÇÃO',
+    'autoRotate': 'Rotação Automática',
+    'autoRotateSub': 'Girar para paisagem durante a reprodução',
+    'videoQuality': 'Qualidade de Vídeo',
+    'videoQualitySub': 'Qualidade de transmissão preferida',
+    'preferredPlayer': 'Reprodutor Preferido',
+    'preferredPlayerSub': 'Escolher reprodutor de vídeo',
+    'playerEngine': 'Motor do Reprodutor',
+    'storage': 'ARMAZENAMENTO',
+    'clearCache': 'Limpar Cache',
+    'clearCacheSub': 'Remover arquivos temporários',
+    'clearHistory': 'Limpar Histórico',
+    'clearHistorySub': 'Remover todos os episódios assistidos',
+    'clearAllData': 'Limpar Todos os Dados',
+    'clearAllDataSub': 'Remover biblioteca, histórico e configurações',
+    'links': 'LINKS',
+    'sourceCode': 'Código Fonte',
+    'reportIssue': 'Reportar Problema',
+    'libraries': 'BIBLIOTECAS',
+    'appInfo': 'APP',
+    'updateAvailable': 'Atualização Disponível',
+    'upToDate': 'Você está Atualizado',
+    'releaseNotes': 'Notas da Versão:',
+    'downloadInstall': 'Baixar e Instalar',
+    'downloading': 'Baixando...',
+    'installing': 'Abrindo instalador...',
+    'later': 'Depois',
+    'ok': 'OK',
+    'cancel': 'Cancelar',
+    'resumeFrom': 'Retomar de?',
+    'startOver': 'Começar de Novo',
+    'resume': 'Retomar',
+    'episode': 'Episódio',
+  },
+  '日本語': {
+    'settings': '設定',
+    'general': '一般',
+    'player': 'プレーヤー',
+    'data': 'データ',
+    'about': 'アプリについて',
+    'checkUpdate': 'アップデートを確認',
+    'tapToCheck': '最新バージョンを確認する',
+    'appearance': '外観',
+    'language': '言語',
+    'theme': 'テーマ',
+    'accentColor': 'アクセントカラー',
+    'content': 'コンテンツ',
+    'nsfwFilter': 'NSFWコンテンツを表示',
+    'nsfwSubtitle': '成人向けアニメを表示',
+    'playback': '再生',
+    'autoRotate': '自動回転',
+    'autoRotateSub': '再生中に横画面に回転',
+    'videoQuality': '画質',
+    'videoQualitySub': '推奨ストリーム品質',
+    'preferredPlayer': '推奨プレーヤー',
+    'preferredPlayerSub': 'ビデオプレーヤーを選択',
+    'playerEngine': 'プレーヤーエンジン',
+    'storage': 'ストレージ',
+    'clearCache': 'キャッシュをクリア',
+    'clearCacheSub': '一時ファイルを削除',
+    'clearHistory': '視聴履歴をクリア',
+    'clearHistorySub': '視聴したエピソードをすべて削除',
+    'clearAllData': 'すべてのデータをクリア',
+    'clearAllDataSub': 'ライブラリ、履歴、設定を削除',
+    'links': 'リンク',
+    'sourceCode': 'ソースコード',
+    'reportIssue': '問題を報告',
+    'libraries': 'ライブラリ',
+    'appInfo': 'アプリ',
+    'updateAvailable': 'アップデートあり',
+    'upToDate': '最新です',
+    'releaseNotes': 'リリースノート:',
+    'downloadInstall': 'ダウンロードしてインストール',
+    'downloading': 'ダウンロード中...',
+    'installing': 'インストーラーを開いています...',
+    'later': '後で',
+    'ok': 'OK',
+    'cancel': 'キャンセル',
+    'resumeFrom': 'ここから再開?',
+    'startOver': '最初から',
+    'resume': '再開',
+    'episode': 'エピソード',
+  },
+  '中文': {
+    'settings': '设置',
+    'general': '通用',
+    'player': '播放器',
+    'data': '数据',
+    'about': '关于',
+    'checkUpdate': '检查更新',
+    'tapToCheck': '点击检查最新版本',
+    'appearance': '外观',
+    'language': '语言',
+    'theme': '主题',
+    'accentColor': '强调色',
+    'content': '内容',
+    'nsfwFilter': '显示NSFW内容',
+    'nsfwSubtitle': '显示成人动漫',
+    'playback': '播放',
+    'autoRotate': '自动旋转',
+    'autoRotateSub': '播放时自动横屏',
+    'videoQuality': '视频质量',
+    'videoQualitySub': '首选流媒体质量',
+    'preferredPlayer': '首选播放器',
+    'preferredPlayerSub': '选择视频播放器',
+    'playerEngine': '播放器引擎',
+    'storage': '存储',
+    'clearCache': '清除缓存',
+    'clearCacheSub': '删除临时文件',
+    'clearHistory': '清除观看历史',
+    'clearHistorySub': '删除所有观看记录',
+    'clearAllData': '清除所有数据',
+    'clearAllDataSub': '删除库、历史和设置',
+    'links': '链接',
+    'sourceCode': '源代码',
+    'reportIssue': '报告问题',
+    'libraries': '库',
+    'appInfo': '应用',
+    'updateAvailable': '有更新',
+    'upToDate': '已是最新',
+    'releaseNotes': '更新说明:',
+    'downloadInstall': '下载并安装',
+    'downloading': '下载中...',
+    'installing': '打开安装程序...',
+    'later': '稍后',
+    'ok': '确定',
+    'cancel': '取消',
+    'resumeFrom': '从这里继续?',
+    'startOver': '从头开始',
+    'resume': '继续',
+    'episode': '集',
+  },
+};
+
+class L10n {
+  static String _lang = 'English';
+  static void setLang(String lang) => _lang = lang;
+  static String t(String key) => translations[_lang]?[key] ?? translations['English']![key] ?? key;
+}
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -25,12 +278,21 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _nsfwFilter = false;
   String _themeColor = 'Gold';
   String _themeName = 'Dark';
+  String _appVersion = '1.2.4';
   bool _loaded = false;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _appVersion = info.version);
+    } catch (_) {}
   }
 
   Future<void> _loadSettings() async {
@@ -46,6 +308,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _themeName = s['theme'] ?? 'Dark';
         _loaded = true;
       });
+      L10n.setLang(_language);
     }
   }
 
@@ -57,13 +320,14 @@ class _SettingsPageState extends State<SettingsPage> {
     } else if (key == 'theme') {
       NipahColors.setTheme(value as String);
       if (mounted) setState(() {});
+    } else if (key == 'language') {
+      L10n.setLang(value as String);
+      if (mounted) setState(() {});
     }
   }
 
   Future<void> _checkForUpdate() async {
-    final packageInfo = await PackageInfo.fromPlatform();
-    final currentVersion = packageInfo.version;
-
+    final currentVersion = _appVersion;
     if (!mounted) return;
     showDialog(
       context: context,
@@ -106,10 +370,7 @@ class _SettingsPageState extends State<SettingsPage> {
       final files = tempDir.listSync(recursive: true);
       int count = 0;
       for (final file in files) {
-        try {
-          await file.delete();
-          count++;
-        } catch (_) {}
+        try { await file.delete(); count++; } catch (_) {}
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -142,9 +403,9 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Text('Settings', style: NipahTheme.heading(size: 28)),
+                  Text(L10n.t('settings'), style: NipahTheme.heading(size: 28)),
                   const Spacer(),
-                  Text('v1.2.1', style: NipahTheme.label(size: 10, color: NipahColors.textDim)),
+                  Text('v$_appVersion', style: NipahTheme.label(size: 10, color: NipahColors.textDim)),
                 ],
               ),
             ),
@@ -163,10 +424,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildSectionTabs() {
     final sections = [
-      {'id': 'general', 'icon': Icons.settings_outlined, 'label': 'General'},
-      {'id': 'player', 'icon': Icons.play_circle_outline, 'label': 'Player'},
-      {'id': 'data', 'icon': Icons.storage_outlined, 'label': 'Data'},
-      {'id': 'about', 'icon': Icons.info_outline, 'label': 'About'},
+      {'id': 'general', 'icon': Icons.settings_outlined, 'label': L10n.t('general')},
+      {'id': 'player', 'icon': Icons.play_circle_outline, 'label': L10n.t('player')},
+      {'id': 'data', 'icon': Icons.storage_outlined, 'label': L10n.t('data')},
+      {'id': 'about', 'icon': Icons.info_outline, 'label': L10n.t('about')},
     ];
 
     return Container(
@@ -210,30 +471,28 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  // ── GENERAL ──────────────────────────────────────────────────────
   Widget _buildGeneralSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // HIGHLIGHT: Check for Update
         _buildUpdateCard(),
         const SizedBox(height: 16),
-        _sectionTitle('APPEARANCE'),
+        _sectionTitle(L10n.t('appearance')),
         const SizedBox(height: 8),
-        _settingRow(icon: Icons.language, title: 'Language',
-          child: _buildDropdown(value: _language, items: ['English', 'Espa\u00f1ol', 'Portugu\u00eas'],
+        _settingRow(icon: Icons.language, title: L10n.t('language'),
+          child: _buildDropdown(value: _language, items: ['English', 'Español', 'Português', '日本語', '中文'],
             onChanged: (v) { setState(() => _language = v ?? 'English'); _save('language', v); })),
         Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.palette, title: 'Theme'),
+        _settingRow(icon: Icons.palette, title: L10n.t('theme')),
         _buildThemeGrid(),
         const SizedBox(height: 8),
-        _settingRow(icon: Icons.color_lens, title: 'Accent Color'),
+        _settingRow(icon: Icons.color_lens, title: L10n.t('accentColor')),
         _buildAccentColorGrid(),
         const SizedBox(height: 16),
-        _sectionTitle('CONTENT'),
+        _sectionTitle(L10n.t('content')),
         const SizedBox(height: 8),
-        _settingRow(icon: Icons.filter_list, title: 'Show NSFW Content',
-          subtitle: 'Show adult-rated anime',
+        _settingRow(icon: Icons.filter_list, title: L10n.t('nsfwFilter'),
+          subtitle: L10n.t('nsfwSubtitle'),
           trailing: _buildToggle(value: _nsfwFilter, onChanged: (v) { setState(() => _nsfwFilter = v); _save('nsfwFilter', v); })),
       ],
     );
@@ -245,9 +504,7 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [NipahColors.accent.main, NipahColors.accent.strong],
-          ),
+          gradient: LinearGradient(colors: [NipahColors.accent.main, NipahColors.accent.strong]),
           border: Border.all(color: NipahColors.accent.strong),
         ),
         child: Row(
@@ -262,9 +519,9 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Check for Update', style: NipahTheme.heading(size: 16, color: NipahColors.bg)),
+                  Text(L10n.t('checkUpdate'), style: NipahTheme.heading(size: 16, color: NipahColors.bg)),
                   const SizedBox(height: 2),
-                  Text('Tap to check latest version', style: NipahTheme.body(size: 11, color: NipahColors.bg.withValues(alpha: 0.7))),
+                  Text(L10n.t('tapToCheck'), style: NipahTheme.body(size: 11, color: NipahColors.bg.withValues(alpha: 0.7))),
                 ],
               ),
             ),
@@ -275,28 +532,27 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ── PLAYER ──────────────────────────────────────────────────────
   Widget _buildPlayerSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('PLAYBACK'),
+        _sectionTitle(L10n.t('playback')),
         const SizedBox(height: 8),
-        _settingRow(icon: Icons.screen_rotation, title: 'Auto Rotate',
-          subtitle: 'Rotate to landscape during playback',
+        _settingRow(icon: Icons.screen_rotation, title: L10n.t('autoRotate'),
+          subtitle: L10n.t('autoRotateSub'),
           trailing: _buildToggle(value: _autoRotate, onChanged: (v) { setState(() => _autoRotate = v); _save('autoRotate', v); })),
         Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.high_quality, title: 'Video Quality',
-          subtitle: 'Preferred stream quality',
+        _settingRow(icon: Icons.high_quality, title: L10n.t('videoQuality'),
+          subtitle: L10n.t('videoQualitySub'),
           child: _buildDropdown(value: _videoQuality, items: ['Auto', '1080p', '720p', '480p', '360p'],
             onChanged: (v) { setState(() => _videoQuality = v ?? 'Auto'); _save('videoQuality', v); })),
         Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.play_circle, title: 'Preferred Player',
-          subtitle: 'Choose video player',
+        _settingRow(icon: Icons.play_circle, title: L10n.t('preferredPlayer'),
+          subtitle: L10n.t('preferredPlayerSub'),
           child: _buildDropdown(value: _defaultPlayer, items: ['In-app Player', 'External Player'],
             onChanged: (v) { setState(() => _defaultPlayer = v ?? 'In-app Player'); _save('player', v); })),
         Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.info_outline, title: 'Player Engine',
+        _settingRow(icon: Icons.info_outline, title: L10n.t('playerEngine'),
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(color: NipahColors.success.withValues(alpha: 0.1), border: Border.all(color: NipahColors.success)),
@@ -306,31 +562,30 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ── DATA ──────────────────────────────────────────────────────
   Widget _buildDataSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('STORAGE'),
+        _sectionTitle(L10n.t('storage')),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: _clearCache,
-          child: _settingRow(icon: Icons.cleaning_services, title: 'Clear Cache',
-            subtitle: 'Remove temporary files',
+          child: _settingRow(icon: Icons.cleaning_services, title: L10n.t('clearCache'),
+            subtitle: L10n.t('clearCacheSub'),
             trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20)),
         ),
         Divider(color: NipahColors.lineSoft),
         GestureDetector(
           onTap: () => _showClearHistoryDialog(),
-          child: _settingRow(icon: Icons.history, title: 'Clear Watch History',
-            subtitle: 'Remove all watched episodes',
+          child: _settingRow(icon: Icons.history, title: L10n.t('clearHistory'),
+            subtitle: L10n.t('clearHistorySub'),
             trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20)),
         ),
         Divider(color: NipahColors.lineSoft),
         GestureDetector(
           onTap: () => _showClearDataDialog(),
-          child: _settingRow(icon: Icons.delete_forever, title: 'Clear All Data',
-            subtitle: 'Remove library, history, and settings',
+          child: _settingRow(icon: Icons.delete_forever, title: L10n.t('clearAllData'),
+            subtitle: L10n.t('clearAllDataSub'),
             iconColor: NipahColors.danger,
             trailing: Icon(Icons.chevron_right, color: NipahColors.danger, size: 20)),
         ),
@@ -338,26 +593,15 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ── ABOUT ──────────────────────────────────────────────────────
   Widget _buildAboutSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('APP'),
+        _sectionTitle(L10n.t('appInfo')),
         const SizedBox(height: 12),
         _buildAppInfoCard(),
         const SizedBox(height: 16),
-        _sectionTitle('LINKS'),
-        const SizedBox(height: 8),
-        _settingRow(icon: Icons.code, title: 'Source Code',
-          trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20),
-        ),
-        Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.bug_report, title: 'Report Issue',
-          trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20),
-        ),
-        const SizedBox(height: 16),
-        _sectionTitle('LIBRARIES'),
+        _sectionTitle(L10n.t('libraries')),
         const SizedBox(height: 8),
         _settingRow(icon: Icons.movie, title: 'MediaKit', subtitle: 'Video player engine'),
         Divider(color: NipahColors.lineSoft),
@@ -368,7 +612,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ── SHARED WIDGETS ──────────────────────────────────────────────
   Widget _sectionTitle(String text) => Text(text, style: NipahTheme.label(size: 11));
 
   Widget _buildAppInfoCard() {
@@ -389,7 +632,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 Text('AnimoBox', style: NipahTheme.heading(size: 18)),
                 const SizedBox(height: 2),
-                Text('Version 1.2.1', style: NipahTheme.body(size: 12, color: NipahColors.textDim)),
+                Text('Version $_appVersion', style: NipahTheme.body(size: 12, color: NipahColors.textDim)),
               ],
             ),
           ),
@@ -510,10 +753,10 @@ class _SettingsPageState extends State<SettingsPage> {
   void _showClearHistoryDialog() {
     showDialog(context: context, builder: (context) => AlertDialog(
       backgroundColor: NipahColors.surface, shape: const RoundedRectangleBorder(),
-      title: Text('Clear Watch History', style: NipahTheme.heading(size: 18)),
-      content: Text('Remove all watched episodes?', style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
+      title: Text(L10n.t('clearHistory'), style: NipahTheme.heading(size: 18)),
+      content: Text(L10n.t('clearHistorySub'), style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: NipahTheme.body(color: NipahColors.textDim))),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(L10n.t('cancel'), style: NipahTheme.body(color: NipahColors.textDim))),
         TextButton(onPressed: () async { await clearHistory(); if (context.mounted) Navigator.pop(context); },
           child: Text('Clear', style: NipahTheme.body(color: NipahColors.danger))),
       ],
@@ -523,10 +766,10 @@ class _SettingsPageState extends State<SettingsPage> {
   void _showClearDataDialog() {
     showDialog(context: context, builder: (context) => AlertDialog(
       backgroundColor: NipahColors.surface, shape: const RoundedRectangleBorder(),
-      title: Text('Clear All Data', style: NipahTheme.heading(size: 18)),
-      content: Text('This will permanently remove library, history, and settings.', style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
+      title: Text(L10n.t('clearAllData'), style: NipahTheme.heading(size: 18)),
+      content: Text(L10n.t('clearAllDataSub'), style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: NipahTheme.body(color: NipahColors.textDim))),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(L10n.t('cancel'), style: NipahTheme.body(color: NipahColors.textDim))),
         TextButton(onPressed: () async { await clearAllData(); if (context.mounted) Navigator.pop(context); },
           child: Text('Clear All', style: NipahTheme.body(color: NipahColors.danger))),
       ],
@@ -612,14 +855,16 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     try {
       final file = File(_filePath);
       if (await file.exists()) {
-        await launchUrl(Uri.file(_filePath), mode: LaunchMode.externalApplication);
-      }
-      if (mounted) {
-        setState(() => _installing = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Opening installer...'),
-          backgroundColor: NipahColors.success,
-        ));
+        final result = await OpenFile.open(_filePath);
+        if (mounted) {
+          setState(() => _installing = false);
+          if (result.type != ResultType.done) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Could not open installer: ${result.message}'),
+              backgroundColor: NipahColors.danger,
+            ));
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -643,7 +888,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
           Icon(widget.hasUpdate ? Icons.system_update : Icons.check_circle_outline,
             color: widget.hasUpdate ? NipahColors.gold : NipahColors.success, size: 48),
           const SizedBox(height: 16),
-          Text(widget.hasUpdate ? 'Update Available' : 'You\'re Up to Date', style: NipahTheme.heading(size: 20)),
+          Text(widget.hasUpdate ? L10n.t('updateAvailable') : L10n.t('upToDate'), style: NipahTheme.heading(size: 20)),
           const SizedBox(height: 8),
           Text(widget.hasUpdate ? 'v${widget.currentVersion} \u2192 v${widget.latestVersion}' : 'Version ${widget.currentVersion}',
             style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
@@ -653,7 +898,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
           ],
           if (widget.releaseNotes.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Align(alignment: Alignment.centerLeft, child: Text('Release Notes:', style: NipahTheme.label(size: 10, color: NipahColors.textDim))),
+            Align(alignment: Alignment.centerLeft, child: Text(L10n.t('releaseNotes'), style: NipahTheme.label(size: 10, color: NipahColors.textDim))),
             const SizedBox(height: 8),
             Container(
               width: double.infinity, constraints: const BoxConstraints(maxHeight: 150),
@@ -667,21 +912,19 @@ class _UpdateDialogState extends State<_UpdateDialog> {
             LinearProgressIndicator(value: _progress > 0 ? _progress : null,
               backgroundColor: NipahColors.surface2, valueColor: AlwaysStoppedAnimation<Color>(NipahColors.gold), minHeight: 4),
             const SizedBox(height: 8),
-            Text(
-              _installing ? 'Opening installer...' : '${(_progress * 100).toStringAsFixed(0)}%',
-              style: NipahTheme.body(size: 11, color: NipahColors.textDim),
-            ),
+            Text(_installing ? L10n.t('installing') : '${(_progress * 100).toStringAsFixed(0)}%',
+              style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
           ],
         ],
       ),
       actions: [
         TextButton(onPressed: (_downloading || _installing) ? null : () => Navigator.pop(context),
-          child: Text(widget.hasUpdate ? 'Later' : 'OK', style: NipahTheme.body(color: NipahColors.textDim))),
+          child: Text(widget.hasUpdate ? L10n.t('later') : L10n.t('ok'), style: NipahTheme.body(color: NipahColors.textDim))),
         if (widget.hasUpdate && widget.apkUrl != null)
           TextButton(
             onPressed: (_downloading || _installing) ? null : _downloadApk,
             child: Text(
-              _installing ? 'Installing...' : _downloading ? 'Downloading...' : 'Download & Install',
+              _installing ? L10n.t('installing') : _downloading ? L10n.t('downloading') : L10n.t('downloadInstall'),
               style: NipahTheme.label(size: 11, color: NipahColors.gold)),
           ),
       ],
