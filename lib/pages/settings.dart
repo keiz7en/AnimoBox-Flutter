@@ -22,6 +22,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String _videoQuality = 'Auto';
   String _defaultPlayer = 'In-app Player';
   bool _autoRotate = true;
+  bool _nsfwFilter = false;
   String _themeColor = 'Gold';
   String _themeName = 'Dark';
   bool _loaded = false;
@@ -40,6 +41,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _videoQuality = s['videoQuality'] ?? 'Auto';
         _defaultPlayer = s['player'] ?? 'In-app Player';
         _autoRotate = s['autoRotate'] ?? true;
+        _nsfwFilter = s['nsfwFilter'] ?? false;
         _themeColor = s['themeColor'] ?? 'Gold';
         _themeName = s['theme'] ?? 'Dark';
         _loaded = true;
@@ -62,6 +64,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final packageInfo = await PackageInfo.fromPlatform();
     final currentVersion = packageInfo.version;
 
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -70,6 +73,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final update = await checkForUpdate();
     if (!mounted) return;
     Navigator.pop(context);
+
     if (update == null) {
       showDialog(context: context, builder: (_) => AlertDialog(
         backgroundColor: NipahColors.surface,
@@ -82,6 +86,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ));
       return;
     }
+
     final latestVersion = update['version'] ?? '';
     final hasUpdate = latestVersion.isNotEmpty && latestVersion != currentVersion;
     showDialog(context: context, builder: (_) => _UpdateDialog(
@@ -95,10 +100,37 @@ class _SettingsPageState extends State<SettingsPage> {
     ));
   }
 
+  Future<void> _clearCache() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final files = tempDir.listSync(recursive: true);
+      int count = 0;
+      for (final file in files) {
+        try {
+          await file.delete();
+          count++;
+        } catch (_) {}
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Cleared $count cache files'),
+          backgroundColor: NipahColors.success,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to clear cache: $e'),
+          backgroundColor: NipahColors.danger,
+        ));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_loaded) {
-      return Scaffold(backgroundColor: NipahColors.bg, body: Center(child: NipahLoader(size: 28)));
+      return Scaffold(backgroundColor: NipahColors.bg, body: const Center(child: NipahLoader(size: 28)));
     }
 
     return Scaffold(
@@ -112,7 +144,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   Text('Settings', style: NipahTheme.heading(size: 28)),
                   const Spacer(),
-                  Text('AnimoBox', style: NipahTheme.label(size: 10, color: NipahColors.textDim)),
+                  Text('v1.2.1', style: NipahTheme.label(size: 10, color: NipahColors.textDim)),
                 ],
               ),
             ),
@@ -132,9 +164,9 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildSectionTabs() {
     final sections = [
       {'id': 'general', 'icon': Icons.settings_outlined, 'label': 'General'},
-      {'id': 'playback', 'icon': Icons.play_circle_outline, 'label': 'Playback'},
-      {'id': 'library', 'icon': Icons.library_books_outlined, 'label': 'Library'},
-      {'id': 'data', 'icon': Icons.delete_outline, 'label': 'Data'},
+      {'id': 'player', 'icon': Icons.play_circle_outline, 'label': 'Player'},
+      {'id': 'data', 'icon': Icons.storage_outlined, 'label': 'Data'},
+      {'id': 'about', 'icon': Icons.info_outline, 'label': 'About'},
     ];
 
     return Container(
@@ -171,187 +203,172 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildSectionContent() {
     switch (_selectedSection) {
       case 'general': return _buildGeneralSection();
-      case 'playback': return _buildPlaybackSection();
-      case 'library': return _buildLibrarySection();
+      case 'player': return _buildPlayerSection();
       case 'data': return _buildDataSection();
+      case 'about': return _buildAboutSection();
       default: return _buildGeneralSection();
     }
   }
 
+  // ── GENERAL ──────────────────────────────────────────────────────
   Widget _buildGeneralSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('APP'),
-        const SizedBox(height: 12),
-        _buildAppInfoCard(),
-        const SizedBox(height: 12),
-        GestureDetector(
-          onTap: _checkForUpdate,
-          child: _settingRow(icon: Icons.system_update, title: 'Check for Update',
-            trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20)),
-        ),
-        const SizedBox(height: 20),
+        // HIGHLIGHT: Check for Update
+        _buildUpdateCard(),
+        const SizedBox(height: 16),
         _sectionTitle('APPEARANCE'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         _settingRow(icon: Icons.language, title: 'Language',
-          child: _buildDropdown(value: _language, items: ['English', 'Espa\u00f1ol', 'Portugu\u00eas', '\u65e5\u672c\u8a9e'],
+          child: _buildDropdown(value: _language, items: ['English', 'Espa\u00f1ol', 'Portugu\u00eas'],
             onChanged: (v) { setState(() => _language = v ?? 'English'); _save('language', v); })),
-        Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.high_quality, title: 'Video Quality',
-          child: _buildDropdown(value: _videoQuality, items: ['Auto', '1080p', '720p', '480p', '360p'],
-            onChanged: (v) { setState(() => _videoQuality = v ?? 'Auto'); _save('videoQuality', v); })),
-        Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.screen_rotation, title: 'Auto Rotate',
-          trailing: _buildToggle(value: _autoRotate, onChanged: (v) { setState(() => _autoRotate = v); _save('autoRotate', v); })),
         Divider(color: NipahColors.lineSoft),
         _settingRow(icon: Icons.palette, title: 'Theme'),
         _buildThemeGrid(),
         const SizedBox(height: 8),
         _settingRow(icon: Icons.color_lens, title: 'Accent Color'),
         _buildAccentColorGrid(),
+        const SizedBox(height: 16),
+        _sectionTitle('CONTENT'),
+        const SizedBox(height: 8),
+        _settingRow(icon: Icons.filter_list, title: 'Show NSFW Content',
+          subtitle: 'Show adult-rated anime',
+          trailing: _buildToggle(value: _nsfwFilter, onChanged: (v) { setState(() => _nsfwFilter = v); _save('nsfwFilter', v); })),
       ],
     );
   }
 
-  Widget _buildThemeGrid() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 32, top: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: appThemes.map((t) {
-          final isSelected = _themeName == t.name;
-          return GestureDetector(
-            onTap: () {
-              setState(() => _themeName = t.name);
-              _save('theme', t.name);
-            },
-            child: Container(
-              width: 72,
-              height: 56,
-              decoration: BoxDecoration(
-                color: t.surface,
-                border: Border.all(
-                  color: isSelected ? NipahColors.gold : t.cardBorder,
-                  width: isSelected ? 2 : 1,
-                ),
-              ),
+  Widget _buildUpdateCard() {
+    return GestureDetector(
+      onTap: _checkForUpdate,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [NipahColors.accent.main, NipahColors.accent.strong],
+          ),
+          border: Border.all(color: NipahColors.accent.strong),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(color: NipahColors.bg.withValues(alpha: 0.3)),
+              child: Icon(Icons.system_update, color: NipahColors.bg, size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(t.name, style: TextStyle(color: t.text, fontSize: 9, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(width: 6, height: 6, color: t.bg),
-                      const SizedBox(width: 2),
-                      Container(width: 6, height: 6, color: t.surface2),
-                      const SizedBox(width: 2),
-                      Container(width: 6, height: 6, color: t.text),
-                    ],
-                  ),
+                  Text('Check for Update', style: NipahTheme.heading(size: 16, color: NipahColors.bg)),
+                  const SizedBox(height: 2),
+                  Text('Tap to check latest version', style: NipahTheme.body(size: 11, color: NipahColors.bg.withValues(alpha: 0.7))),
                 ],
               ),
             ),
-          );
-        }).toList(),
+            Icon(Icons.arrow_forward, color: NipahColors.bg, size: 20),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildAccentColorGrid() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 32, top: 8),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: accentPalette.map((accent) {
-          final isSelected = _themeColor == accent.name;
-          return GestureDetector(
-            onTap: () {
-              setState(() => _themeColor = accent.name);
-              _save('themeColor', accent.name);
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: accent.main,
-                border: Border.all(
-                  color: isSelected ? NipahColors.text : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-              child: isSelected ? Icon(Icons.check, color: NipahColors.bg, size: 18) : null,
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildPlaybackSection() {
+  // ── PLAYER ──────────────────────────────────────────────────────
+  Widget _buildPlayerSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('PLAYBACK'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        _settingRow(icon: Icons.screen_rotation, title: 'Auto Rotate',
+          subtitle: 'Rotate to landscape during playback',
+          trailing: _buildToggle(value: _autoRotate, onChanged: (v) { setState(() => _autoRotate = v); _save('autoRotate', v); })),
+        Divider(color: NipahColors.lineSoft),
+        _settingRow(icon: Icons.high_quality, title: 'Video Quality',
+          subtitle: 'Preferred stream quality',
+          child: _buildDropdown(value: _videoQuality, items: ['Auto', '1080p', '720p', '480p', '360p'],
+            onChanged: (v) { setState(() => _videoQuality = v ?? 'Auto'); _save('videoQuality', v); })),
+        Divider(color: NipahColors.lineSoft),
         _settingRow(icon: Icons.play_circle, title: 'Preferred Player',
+          subtitle: 'Choose video player',
           child: _buildDropdown(value: _defaultPlayer, items: ['In-app Player', 'External Player'],
             onChanged: (v) { setState(() => _defaultPlayer = v ?? 'In-app Player'); _save('player', v); })),
         Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.info_outline, title: 'Player Status',
+        _settingRow(icon: Icons.info_outline, title: 'Player Engine',
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(color: NipahColors.success.withValues(alpha: 0.1), border: Border.all(color: NipahColors.success)),
-            child: Text('Active', style: NipahTheme.label(size: 9, color: NipahColors.success)),
+            child: Text('MediaKit', style: NipahTheme.label(size: 9, color: NipahColors.success)),
           )),
       ],
     );
   }
 
-  Widget _buildLibrarySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionTitle('LIBRARY'),
-        const SizedBox(height: 12),
-        _settingRow(icon: Icons.folder_open, title: 'Library Status',
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: NipahColors.success.withValues(alpha: 0.1), border: Border.all(color: NipahColors.success)),
-            child: Text('Active', style: NipahTheme.label(size: 9, color: NipahColors.success)),
-          )),
-        Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.sync, title: 'Sync Status',
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(border: Border.all(color: NipahColors.lineSoft)),
-            child: Text('Local Only', style: NipahTheme.label(size: 9, color: NipahColors.textDim)),
-          )),
-      ],
-    );
-  }
-
+  // ── DATA ──────────────────────────────────────────────────────
   Widget _buildDataSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('DATA'),
-        const SizedBox(height: 12),
+        _sectionTitle('STORAGE'),
+        const SizedBox(height: 8),
         GestureDetector(
-          onTap: () => _showClearDialog(context),
-          child: _settingRow(icon: Icons.delete_outline, title: 'Clear All Data',
-            subtitle: 'Remove library and watch history',
-            trailing: Icon(Icons.chevron_right, color: NipahColors.danger, size: 20),
-            iconColor: NipahColors.danger),
+          onTap: _clearCache,
+          child: _settingRow(icon: Icons.cleaning_services, title: 'Clear Cache',
+            subtitle: 'Remove temporary files',
+            trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20)),
+        ),
+        Divider(color: NipahColors.lineSoft),
+        GestureDetector(
+          onTap: () => _showClearHistoryDialog(),
+          child: _settingRow(icon: Icons.history, title: 'Clear Watch History',
+            subtitle: 'Remove all watched episodes',
+            trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20)),
+        ),
+        Divider(color: NipahColors.lineSoft),
+        GestureDetector(
+          onTap: () => _showClearDataDialog(),
+          child: _settingRow(icon: Icons.delete_forever, title: 'Clear All Data',
+            subtitle: 'Remove library, history, and settings',
+            iconColor: NipahColors.danger,
+            trailing: Icon(Icons.chevron_right, color: NipahColors.danger, size: 20)),
         ),
       ],
     );
   }
 
+  // ── ABOUT ──────────────────────────────────────────────────────
+  Widget _buildAboutSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('APP'),
+        const SizedBox(height: 12),
+        _buildAppInfoCard(),
+        const SizedBox(height: 16),
+        _sectionTitle('LINKS'),
+        const SizedBox(height: 8),
+        _settingRow(icon: Icons.code, title: 'Source Code',
+          trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20),
+        ),
+        Divider(color: NipahColors.lineSoft),
+        _settingRow(icon: Icons.bug_report, title: 'Report Issue',
+          trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20),
+        ),
+        const SizedBox(height: 16),
+        _sectionTitle('LIBRARIES'),
+        const SizedBox(height: 8),
+        _settingRow(icon: Icons.movie, title: 'MediaKit', subtitle: 'Video player engine'),
+        Divider(color: NipahColors.lineSoft),
+        _settingRow(icon: Icons.wifi, title: 'AniList API', subtitle: 'Anime data source'),
+        Divider(color: NipahColors.lineSoft),
+        _settingRow(icon: Icons.storage, title: 'Shared Preferences', subtitle: 'Local storage'),
+      ],
+    );
+  }
+
+  // ── SHARED WIDGETS ──────────────────────────────────────────────
   Widget _sectionTitle(String text) => Text(text, style: NipahTheme.label(size: 11));
 
   Widget _buildAppInfoCard() {
@@ -372,7 +389,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 Text('AnimoBox', style: NipahTheme.heading(size: 18)),
                 const SizedBox(height: 2),
-                Text('Version 1.2.0', style: NipahTheme.body(size: 12, color: NipahColors.textDim)),
+                Text('Version 1.2.1', style: NipahTheme.body(size: 12, color: NipahColors.textDim)),
               ],
             ),
           ),
@@ -404,6 +421,61 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _buildThemeGrid() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 32, top: 8),
+      child: Wrap(
+        spacing: 8, runSpacing: 8,
+        children: appThemes.map((t) {
+          final isSelected = _themeName == t.name;
+          return GestureDetector(
+            onTap: () { setState(() => _themeName = t.name); _save('theme', t.name); },
+            child: Container(
+              width: 72, height: 56,
+              decoration: BoxDecoration(color: t.surface, border: Border.all(
+                color: isSelected ? NipahColors.gold : t.cardBorder, width: isSelected ? 2 : 1)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(t.name, style: TextStyle(color: t.text, fontSize: 9, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Container(width: 6, height: 6, color: t.bg),
+                    const SizedBox(width: 2),
+                    Container(width: 6, height: 6, color: t.surface2),
+                    const SizedBox(width: 2),
+                    Container(width: 6, height: 6, color: t.text),
+                  ]),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildAccentColorGrid() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 32, top: 8),
+      child: Wrap(
+        spacing: 10, runSpacing: 10,
+        children: accentPalette.map((accent) {
+          final isSelected = _themeColor == accent.name;
+          return GestureDetector(
+            onTap: () { setState(() => _themeColor = accent.name); _save('themeColor', accent.name); },
+            child: Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(color: accent.main, border: Border.all(
+                color: isSelected ? NipahColors.text : Colors.transparent, width: 2)),
+              child: isSelected ? Icon(Icons.check, color: NipahColors.bg, size: 18) : null,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _buildDropdown({required String value, required List<String> items, required ValueChanged<String?> onChanged}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -425,8 +497,7 @@ class _SettingsPageState extends State<SettingsPage> {
         width: 40, height: 22,
         decoration: BoxDecoration(
           color: value ? NipahColors.gold : NipahColors.surface2,
-          border: Border.all(color: value ? NipahColors.gold : NipahColors.lineSoft),
-        ),
+          border: Border.all(color: value ? NipahColors.gold : NipahColors.lineSoft)),
         child: AnimatedAlign(
           duration: const Duration(milliseconds: 200),
           alignment: value ? Alignment.centerRight : Alignment.centerLeft,
@@ -436,23 +507,30 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _showClearDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: NipahColors.surface,
-        shape: const RoundedRectangleBorder(),
-        title: Text('Clear All Data', style: NipahTheme.heading(size: 18)),
-        content: Text('This will permanently remove your library and watch history.', style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: NipahTheme.body(color: NipahColors.textDim))),
-          TextButton(
-            onPressed: () async { await clearAllData(); if (context.mounted) Navigator.pop(context); },
-            child: Text('Clear', style: NipahTheme.body(color: NipahColors.danger)),
-          ),
-        ],
-      ),
-    );
+  void _showClearHistoryDialog() {
+    showDialog(context: context, builder: (context) => AlertDialog(
+      backgroundColor: NipahColors.surface, shape: const RoundedRectangleBorder(),
+      title: Text('Clear Watch History', style: NipahTheme.heading(size: 18)),
+      content: Text('Remove all watched episodes?', style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: NipahTheme.body(color: NipahColors.textDim))),
+        TextButton(onPressed: () async { await clearHistory(); if (context.mounted) Navigator.pop(context); },
+          child: Text('Clear', style: NipahTheme.body(color: NipahColors.danger))),
+      ],
+    ));
+  }
+
+  void _showClearDataDialog() {
+    showDialog(context: context, builder: (context) => AlertDialog(
+      backgroundColor: NipahColors.surface, shape: const RoundedRectangleBorder(),
+      title: Text('Clear All Data', style: NipahTheme.heading(size: 18)),
+      content: Text('This will permanently remove library, history, and settings.', style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: NipahTheme.body(color: NipahColors.textDim))),
+        TextButton(onPressed: () async { await clearAllData(); if (context.mounted) Navigator.pop(context); },
+          child: Text('Clear All', style: NipahTheme.body(color: NipahColors.danger))),
+      ],
+    ));
   }
 }
 
@@ -516,20 +594,15 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Downloaded: AnimoBox-${widget.latestVersion}.apk'),
           action: SnackBarAction(label: 'Install', textColor: NipahColors.gold, onPressed: () async {
-            final file = File(filePath);
-            if (await file.exists()) {
-              await launchUrl(Uri.file(filePath), mode: LaunchMode.externalApplication);
-            }
+            final f = File(filePath);
+            if (await f.exists()) await launchUrl(Uri.file(filePath), mode: LaunchMode.externalApplication);
           }),
         ));
       }
     } catch (e) {
       if (mounted) {
         setState(() => _downloading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Download failed: $e'),
-          backgroundColor: NipahColors.danger,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e'), backgroundColor: NipahColors.danger));
       }
     }
   }
@@ -542,74 +615,45 @@ class _UpdateDialogState extends State<_UpdateDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            widget.hasUpdate ? Icons.system_update : Icons.check_circle_outline,
-            color: widget.hasUpdate ? NipahColors.gold : NipahColors.success,
-            size: 48,
-          ),
+          Icon(widget.hasUpdate ? Icons.system_update : Icons.check_circle_outline,
+            color: widget.hasUpdate ? NipahColors.gold : NipahColors.success, size: 48),
           const SizedBox(height: 16),
-          Text(
-            widget.hasUpdate ? 'Update Available' : 'You\'re Up to Date',
-            style: NipahTheme.heading(size: 20),
-          ),
+          Text(widget.hasUpdate ? 'Update Available' : 'You\'re Up to Date', style: NipahTheme.heading(size: 20)),
           const SizedBox(height: 8),
-          Text(
-            widget.hasUpdate
-                ? 'v${widget.currentVersion} \u2192 v${widget.latestVersion}'
-                : 'Version ${widget.currentVersion}',
-            style: NipahTheme.body(size: 13, color: NipahColors.textDim),
-          ),
+          Text(widget.hasUpdate ? 'v${widget.currentVersion} \u2192 v${widget.latestVersion}' : 'Version ${widget.currentVersion}',
+            style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
           if (widget.apkSize != null) ...[
             const SizedBox(height: 4),
-            Text(
-              _formatSize(widget.apkSize),
-              style: NipahTheme.body(size: 11, color: NipahColors.textDim),
-            ),
+            Text(_formatSize(widget.apkSize), style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
           ],
           if (widget.releaseNotes.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Release Notes:', style: NipahTheme.label(size: 10, color: NipahColors.textDim)),
-            ),
+            Align(alignment: Alignment.centerLeft, child: Text('Release Notes:', style: NipahTheme.label(size: 10, color: NipahColors.textDim))),
             const SizedBox(height: 8),
             Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(maxHeight: 150),
+              width: double.infinity, constraints: const BoxConstraints(maxHeight: 150),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: NipahColors.surface2, border: Border.all(color: NipahColors.lineSoft)),
-              child: SingleChildScrollView(
-                child: Text(widget.releaseNotes, style: NipahTheme.body(size: 12, color: NipahColors.textSoft)),
-              ),
+              child: SingleChildScrollView(child: Text(widget.releaseNotes, style: NipahTheme.body(size: 12, color: NipahColors.textSoft))),
             ),
           ],
           if (_downloading) ...[
             const SizedBox(height: 16),
-            ClipRRect(
-              child: LinearProgressIndicator(
-                value: _progress > 0 ? _progress : null,
-                backgroundColor: NipahColors.surface2,
-                valueColor: AlwaysStoppedAnimation<Color>(NipahColors.gold),
-                minHeight: 4,
-              ),
-            ),
+            LinearProgressIndicator(value: _progress > 0 ? _progress : null,
+              backgroundColor: NipahColors.surface2, valueColor: AlwaysStoppedAnimation<Color>(NipahColors.gold), minHeight: 4),
             const SizedBox(height: 8),
             Text('${(_progress * 100).toStringAsFixed(0)}%', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
           ],
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(widget.hasUpdate ? 'Later' : 'OK', style: NipahTheme.body(color: NipahColors.textDim)),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context),
+          child: Text(widget.hasUpdate ? 'Later' : 'OK', style: NipahTheme.body(color: NipahColors.textDim))),
         if (widget.hasUpdate && widget.apkUrl != null)
           TextButton(
             onPressed: _downloading ? null : _downloadApk,
-            child: Text(
-              _downloading ? 'Downloading...' : 'Download',
-              style: NipahTheme.label(size: 11, color: NipahColors.gold),
-            ),
+            child: Text(_downloading ? 'Downloading...' : 'Download',
+              style: NipahTheme.label(size: 11, color: NipahColors.gold)),
           ),
       ],
     );

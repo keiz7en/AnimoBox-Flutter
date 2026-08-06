@@ -55,11 +55,8 @@ class _WatchPageState extends State<WatchPage> {
     _player = Player();
     _videoController = VideoController(_player);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
     WakelockPlus.enable();
+    _applyAutoRotate();
 
     _player.stream.playing.listen((playing) {
       if (mounted) {
@@ -82,6 +79,19 @@ class _WatchPageState extends State<WatchPage> {
 
     _loadSavedPosition();
     _loadStream();
+  }
+
+  Future<void> _applyAutoRotate() async {
+    final settings = await getSettings();
+    final autoRotate = settings['autoRotate'] ?? true;
+    if (autoRotate) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    }
   }
 
   @override

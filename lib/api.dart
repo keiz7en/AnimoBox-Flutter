@@ -85,32 +85,46 @@ Future<List<Anime>> _fetchAniList({
 }
 
 Future<List<Anime>> getRecentEpisodes({int page = 1}) async {
-  return _fetchAniList(page: page, perPage: 50, sort: ['UPDATED_AT_DESC'], status: 'RELEASING');
+  final list = await _fetchAniList(page: page, perPage: 50, sort: ['UPDATED_AT_DESC'], status: 'RELEASING');
+  return _filterNSFW(list);
 }
 
 Future<List<Anime>> getTopAnime({int page = 1, String sort = 'SCORE_DESC'}) async {
-  return _fetchAniList(page: page, perPage: 50, sort: [sort]);
+  final list = await _fetchAniList(page: page, perPage: 50, sort: [sort]);
+  return _filterNSFW(list);
 }
 
 Future<List<Anime>> searchAnime(String query, {int page = 1}) async {
   if (query.trim().isEmpty) return [];
-  return _fetchAniList(page: page, perPage: 50, search: query.trim());
+  final list = await _fetchAniList(page: page, perPage: 50, search: query.trim());
+  return _filterNSFW(list);
 }
 
 Future<List<Anime>> getAiringSchedule() async {
-  return _fetchAniList(sort: ['POPULARITY_DESC'], status: 'RELEASING');
+  final list = await _fetchAniList(sort: ['POPULARITY_DESC'], status: 'RELEASING');
+  return _filterNSFW(list);
 }
 
 Future<List<Anime>> getFinishedAnime({int page = 1}) async {
-  return _fetchAniList(page: page, sort: ['END_DATE_DESC'], status: 'FINISHED');
+  final list = await _fetchAniList(page: page, sort: ['END_DATE_DESC'], status: 'FINISHED');
+  return _filterNSFW(list);
 }
 
 Future<List<Anime>> getUpcomingAnime({int page = 1}) async {
-  return _fetchAniList(page: page, sort: ['START_DATE_DESC'], status: 'NOT_YET_RELEASED');
+  final list = await _fetchAniList(page: page, sort: ['START_DATE_DESC'], status: 'NOT_YET_RELEASED');
+  return _filterNSFW(list);
 }
 
 Future<List<Anime>> getNewFinishedAnime({int page = 1}) async {
-  return _fetchAniList(page: page, sort: ['POPULARITY_DESC'], status: 'FINISHED');
+  final list = await _fetchAniList(page: page, sort: ['POPULARITY_DESC'], status: 'FINISHED');
+  return _filterNSFW(list);
+}
+
+Future<List<Anime>> _filterNSFW(List<Anime> list) async {
+  final settings = await getSettings();
+  final showNSFW = settings['nsfwFilter'] ?? false;
+  if (showNSFW) return list;
+  return list.where((a) => !a.isAdult).toList();
 }
 
 Future<List<String>> getGenreList() async {
@@ -747,6 +761,7 @@ const Map<String, dynamic> defaultSettings = {
   'videoQuality': 'Auto',
   'player': 'In-app Player',
   'autoRotate': true,
+  'nsfwFilter': false,
   'themeColor': 'Gold',
   'theme': 'Dark',
 };
