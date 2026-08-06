@@ -50,6 +50,7 @@ const Map<String, Map<String, String>> translations = {
     'downloadInstall': 'Download & Install',
     'downloading': 'Downloading...',
     'installing': 'Opening installer...',
+    'install': 'Install',
     'later': 'Later',
     'ok': 'OK',
     'cancel': 'Cancel',
@@ -139,6 +140,7 @@ const Map<String, Map<String, String>> translations = {
     'downloadInstall': 'Descargar e Instalar',
     'downloading': 'Descargando...',
     'installing': 'Abriendo instalador...',
+    'install': 'Instalar',
     'later': 'Después',
     'ok': 'OK',
     'cancel': 'Cancelar',
@@ -228,6 +230,7 @@ const Map<String, Map<String, String>> translations = {
     'downloadInstall': 'Baixar e Instalar',
     'downloading': 'Baixando...',
     'installing': 'Abrindo instalador...',
+    'install': 'Instalar',
     'later': 'Depois',
     'ok': 'OK',
     'cancel': 'Cancelar',
@@ -317,6 +320,7 @@ const Map<String, Map<String, String>> translations = {
     'downloadInstall': 'ダウンロードしてインストール',
     'downloading': 'ダウンロード中...',
     'installing': 'インストーラーを開いています...',
+    'install': 'インストール',
     'later': '後で',
     'ok': 'OK',
     'cancel': 'キャンセル',
@@ -406,6 +410,7 @@ const Map<String, Map<String, String>> translations = {
     'downloadInstall': '下载并安装',
     'downloading': '下载中...',
     'installing': '打开安装程序...',
+    'install': '安装',
     'later': '稍后',
     'ok': '确定',
     'cancel': '取消',
@@ -1003,6 +1008,7 @@ class _UpdateDialog extends StatefulWidget {
 class _UpdateDialogState extends State<_UpdateDialog> {
   bool _downloading = false;
   bool _installing = false;
+  bool _downloadDone = false;
   double _progress = 0;
   String _filePath = '';
 
@@ -1050,7 +1056,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
       }
       await sink.close();
       if (mounted) {
-        setState(() { _downloading = false; _installing = true; _progress = 1; });
+        setState(() { _downloading = false; _downloadDone = true; _progress = 1; });
         await _installApk();
       }
     } catch (e) {
@@ -1132,9 +1138,9 @@ class _UpdateDialogState extends State<_UpdateDialog> {
           child: Text(widget.hasUpdate ? L10n.t('later') : L10n.t('ok'), style: NipahTheme.body(color: NipahColors.textDim))),
         if (widget.hasUpdate && widget.apkUrl != null)
           TextButton(
-            onPressed: (_downloading || _installing) ? null : _downloadApk,
+            onPressed: (_downloading || _installing) ? null : (_downloadDone ? _installApk : _downloadApk),
             child: Text(
-              _installing ? L10n.t('installing') : _downloading ? L10n.t('downloading') : L10n.t('downloadInstall'),
+              _installing ? L10n.t('installing') : _downloading ? L10n.t('downloading') : _downloadDone ? L10n.t('install') : L10n.t('downloadInstall'),
               style: NipahTheme.label(size: 11, color: NipahColors.gold)),
           ),
       ],
