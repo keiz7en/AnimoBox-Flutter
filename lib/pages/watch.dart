@@ -48,6 +48,8 @@ class _WatchPageState extends State<WatchPage> {
 
   String get _positionKey => '${widget.anilistId}_ep${widget.episode}';
 
+  Duration _lastSavedPosition = Duration.zero;
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +70,12 @@ class _WatchPageState extends State<WatchPage> {
           setState(() => _showControls = true);
           _saveCurrentPosition();
         }
+      }
+    });
+
+    _player.stream.position.listen((position) {
+      if (mounted && _isPlaying && position.inSeconds > 2) {
+        _lastSavedPosition = position;
       }
     });
 
@@ -131,8 +139,9 @@ class _WatchPageState extends State<WatchPage> {
   void _saveCurrentPosition() {
     final pos = _player.state.position;
     final dur = _player.state.duration;
-    if (pos.inSeconds > 2 && dur.inSeconds > 5) {
-      savePlaybackPosition(_positionKey, pos, dur);
+    final savePos = pos.inSeconds > 2 ? pos : _lastSavedPosition;
+    if (savePos.inSeconds > 2 && dur.inSeconds > 5) {
+      savePlaybackPosition(_positionKey, savePos, dur);
     }
   }
 
@@ -147,11 +156,15 @@ class _WatchPageState extends State<WatchPage> {
     setState(() {
       _showResumeDialog = false;
     });
-    if (_savedPosition.inSeconds > 0) {
-      _player.seek(_savedPosition);
-    }
+    final target = _savedPosition;
+    _savedPosition = Duration.zero;
     _player.play();
     _startPositionSaveTimer();
+    if (target.inSeconds > 0) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _player.seek(target);
+      });
+    }
   }
 
   void _startFromBeginning() {
