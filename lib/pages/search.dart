@@ -3,6 +3,7 @@ import '../api.dart';
 import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/anime_card.dart';
+import 'settings.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -177,7 +178,7 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
         controller: _searchController,
         style: NipahTheme.body(size: 14),
         decoration: InputDecoration(
-          hintText: 'SEARCH ANIME...',
+          hintText: L10n.t('search'),
           hintStyle: NipahTheme.body(size: 13, color: NipahColors.textDim),
           prefixIcon: Icon(Icons.search, color: NipahColors.textDim),
           suffixIcon: _searchController.text.isNotEmpty
@@ -229,11 +230,11 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
         unselectedLabelColor: NipahColors.textDim,
         labelStyle: NipahTheme.label(size: 11),
         unselectedLabelStyle: NipahTheme.label(size: 11),
-        tabs: const [
-          Tab(text: 'SEARCH'),
-          Tab(text: 'TOP ANIME'),
-          Tab(text: 'SCHEDULE'),
-          Tab(text: 'GENRES'),
+        tabs: [
+          Tab(text: L10n.t('search').toUpperCase()),
+          Tab(text: L10n.t('top').toUpperCase()),
+          Tab(text: L10n.t('schedule').toUpperCase()),
+          Tab(text: L10n.t('genres').toUpperCase()),
         ],
       ),
     );
@@ -250,7 +251,7 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
           children: [
             Icon(Icons.search_off, size: 64, color: NipahColors.textDim),
             const SizedBox(height: 16),
-            Text('No results found', style: NipahTheme.body(color: NipahColors.textDim)),
+            Text(L10n.t('noHistoryYet'), style: NipahTheme.body(color: NipahColors.textDim)),
           ],
         ),
       );
@@ -261,7 +262,7 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Text('Quick Search', style: NipahTheme.label(size: 11)),
+            child: Text(L10n.t('quickSearch'), style: NipahTheme.label(size: 11)),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),

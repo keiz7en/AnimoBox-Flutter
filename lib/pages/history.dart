@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api.dart';
+import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'anime_detail.dart';
+import 'watch.dart';
+import 'settings.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -82,7 +85,7 @@ class _HistoryPageState extends State<HistoryPage> {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          Text('Watch History', style: NipahTheme.heading(size: 28)),
+          Text(L10n.t('watchHistory'), style: NipahTheme.heading(size: 28)),
           const Spacer(),
           if (_history.isNotEmpty)
             Container(
@@ -94,7 +97,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 color: Color(0x1ad7a35a),
               ),
               child: Text(
-                '${_history.length} episodes',
+                '${_history.length} ${L10n.t('episodesCount')}',
                 style: NipahTheme.label(size: 10, color: NipahColors.goldStrong),
               ),
             ),
@@ -117,12 +120,12 @@ class _HistoryPageState extends State<HistoryPage> {
           Icon(Icons.history, size: 64, color: NipahColors.textDim),
           const SizedBox(height: 16),
           Text(
-            'No watch history yet',
+            L10n.t('noHistoryYet'),
             style: NipahTheme.body(size: 14, color: NipahColors.textDim),
           ),
           const SizedBox(height: 8),
           Text(
-            'Start watching anime to build your history',
+            L10n.t('startWatching'),
             style: NipahTheme.body(size: 12, color: NipahColors.textDim),
           ),
         ],
@@ -259,6 +262,30 @@ class _NipahHistoryItem extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                icon: Icon(Icons.play_circle, color: NipahColors.gold, size: 24),
+                onPressed: () {
+                  final animeId = item['anilistId'] ?? 0;
+                  final episode = item['episode'] ?? 1;
+                  final animeTitle = item['animeTitle'] ?? '';
+                  final coverImage = item['coverImage'] ?? '';
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WatchPage(
+                        animeTitle: animeTitle,
+                        episode: episode,
+                        anilistId: animeId,
+                        anime: Anime(
+                          id: animeId,
+                          title: animeTitle,
+                          coverImage: coverImage,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
               IconButton(
                 icon: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 24),

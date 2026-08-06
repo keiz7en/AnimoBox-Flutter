@@ -8,6 +8,7 @@ import '../api.dart';
 import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
+import 'settings.dart';
 
 class WatchPage extends StatefulWidget {
   final String animeTitle;
@@ -117,7 +118,7 @@ class _WatchPageState extends State<WatchPage> {
       if (posMs > 0 && durMs > 0) {
         final pos = Duration(milliseconds: posMs);
         final dur = Duration(milliseconds: durMs);
-        if (dur.inSeconds > 10 && pos.inSeconds > 5) {
+        if (dur.inSeconds > 5 && pos.inSeconds > 2) {
           setState(() {
             _savedPosition = pos;
             _showResumeDialog = true;
@@ -130,14 +131,14 @@ class _WatchPageState extends State<WatchPage> {
   void _saveCurrentPosition() {
     final pos = _player.state.position;
     final dur = _player.state.duration;
-    if (pos.inSeconds > 5 && dur.inSeconds > 10) {
+    if (pos.inSeconds > 2 && dur.inSeconds > 5) {
       savePlaybackPosition(_positionKey, pos, dur);
     }
   }
 
   void _startPositionSaveTimer() {
     _positionSaveTimer?.cancel();
-    _positionSaveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _positionSaveTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (_isPlaying) _saveCurrentPosition();
     });
   }
@@ -342,7 +343,7 @@ class _WatchPageState extends State<WatchPage> {
                     margin: const EdgeInsets.symmetric(vertical: 12),
                     color: NipahColors.textDim,
                   ),
-                  Text('Select Server', style: NipahTheme.heading(size: 18)),
+                  Text(L10n.t('selectServer'), style: NipahTheme.heading(size: 18)),
                   const SizedBox(height: 8),
                   Expanded(
                     child: ListView.builder(
@@ -524,7 +525,7 @@ class _WatchPageState extends State<WatchPage> {
             children: [
               Icon(Icons.play_circle_outline, color: NipahColors.gold, size: 48),
               const SizedBox(height: 16),
-              Text('Resume from $timeStr?', style: NipahTheme.heading(size: 20)),
+              Text('${L10n.t('resumeFrom')} $timeStr?', style: NipahTheme.heading(size: 20)),
               const SizedBox(height: 8),
               Text(
                 'Episode $_currentEpisode',
@@ -542,7 +543,7 @@ class _WatchPageState extends State<WatchPage> {
                         border: Border.all(color: NipahColors.lineSoft),
                         color: NipahColors.surface2,
                       ),
-                      child: Text('Start Over', style: NipahTheme.label(size: 11, color: NipahColors.textDim)),
+                      child: Text(L10n.t('startOver'), style: NipahTheme.label(size: 11, color: NipahColors.textDim)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -555,7 +556,7 @@ class _WatchPageState extends State<WatchPage> {
                           colors: [NipahColors.gold, NipahColors.goldStrong],
                         ),
                       ),
-                      child: Text('Resume', style: NipahTheme.label(size: 11, color: NipahColors.bg)),
+                      child: Text(L10n.t('resume'), style: NipahTheme.label(size: 11, color: NipahColors.bg)),
                     ),
                   ),
                 ],
@@ -575,12 +576,12 @@ class _WatchPageState extends State<WatchPage> {
           const NipahLoader(size: 36),
           const SizedBox(height: 16),
           Text(
-            'Loading Episode $_currentEpisode...',
+            '${L10n.t('loading')} ${L10n.t('episode')} $_currentEpisode...',
             style: NipahTheme.body(color: NipahColors.textSoft),
           ),
           const SizedBox(height: 8),
           Text(
-            'Trying AnimeHeaven, AniKoto...',
+            L10n.t('trying'),
             style: NipahTheme.body(size: 12, color: NipahColors.textDim),
           ),
         ],
@@ -601,7 +602,7 @@ class _WatchPageState extends State<WatchPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'All streaming servers failed',
+              L10n.t('allFailed'),
               style: NipahTheme.body(size: 12, color: NipahColors.textDim),
               textAlign: TextAlign.center,
             ),
@@ -615,7 +616,7 @@ class _WatchPageState extends State<WatchPage> {
                     colors: [NipahColors.gold, NipahColors.goldStrong],
                   ),
                 ),
-                child: Text('Retry All Sources', style: NipahTheme.label(size: 11, color: NipahColors.bg)),
+                child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 11, color: NipahColors.bg)),
               ),
             ),
           ],
@@ -676,7 +677,7 @@ class _WatchPageState extends State<WatchPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Episode $_currentEpisode',
+                '${L10n.t('episode')} $_currentEpisode',
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
                   ),
                 ],

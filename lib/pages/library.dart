@@ -4,6 +4,7 @@ import '../api.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'anime_detail.dart';
+import 'settings.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
@@ -58,7 +59,7 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not load anime details', style: NipahTheme.body(size: 13)),
+          content: Text(L10n.t('couldNotLoad'), style: NipahTheme.body(size: 13)),
           backgroundColor: NipahColors.surface,
         ),
       );
@@ -88,7 +89,7 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
                 color: NipahColors.textDim,
               ),
               const SizedBox(height: 16),
-              Text('Change Status', style: NipahTheme.heading(size: 18)),
+              Text(L10n.t('changeStatus'), style: NipahTheme.heading(size: 18)),
               const SizedBox(height: 16),
               ...statuses.map((status) {
                 final isSelected = item['status'] == status;
@@ -113,7 +114,7 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
               }),
               ListTile(
                 leading: Icon(Icons.delete, color: NipahColors.danger),
-                title: Text('Remove from Library', style: NipahTheme.body(color: NipahColors.danger)),
+                title: Text(L10n.t('removeFromLibrary'), style: NipahTheme.body(color: NipahColors.danger)),
                 onTap: () async {
                   await removeFromLibrary(item['id']);
                   if (mounted) {
@@ -178,7 +179,7 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          Text('My Library', style: NipahTheme.heading(size: 28)),
+          Text(L10n.t('library'), style: NipahTheme.heading(size: 28)),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -281,13 +282,13 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
           const SizedBox(height: 16),
           Text(
             _selectedStatus == 'All'
-                ? 'Your library is empty'
-                : 'No anime in this category',
+                ? L10n.t('noAnimeYet')
+                : L10n.t('noAnimeYet'),
             style: NipahTheme.body(size: 14, color: NipahColors.textDim),
           ),
           const SizedBox(height: 8),
           Text(
-            'Browse and add anime to your library',
+            L10n.t('addAnimeHint'),
             style: NipahTheme.body(size: 12, color: NipahColors.textDim),
           ),
         ],

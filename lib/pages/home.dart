@@ -6,6 +6,7 @@ import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/anime_card.dart';
 import 'anime_detail.dart';
+import 'settings.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -281,7 +282,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: NipahTheme.goldButtonDecoration,
                           child: Text(
-                            'WATCH NOW',
+                            L10n.t('watchNow'),
                             style: NipahTheme.label(
                               size: 12,
                               color: NipahColors.bg,
@@ -347,21 +348,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         dividerColor: Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        tabs: const [
-          Tab(text: 'SCHEDULE'),
-          Tab(text: 'TOP'),
-          Tab(text: 'LATEST'),
+        tabs: [
+          Tab(text: L10n.t('schedule')),
+          Tab(text: L10n.t('top')),
+          Tab(text: L10n.t('latest')),
         ],
       ),
     );
   }
 
   Widget _buildSectionHeader() {
-    final labels = ['Airing Schedule', 'Top Rated', 'Recently Updated'];
+    final labels = [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
     final sublabels = [
-      'Currently airing anime',
-      'Highest rated anime series',
-      'Freshly updated anime episodes',
+      L10n.t('schedule'),
+      L10n.t('top'),
+      L10n.t('latest'),
     ];
     final idx = _tabController.index;
     return Container(
@@ -390,14 +391,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           children: [
             Icon(Icons.movie_filter, size: 56, color: NipahColors.textDim),
             const SizedBox(height: 12),
-            Text('No anime found', style: NipahTheme.body(size: 15, color: NipahColors.textDim)),
+            Text(L10n.t('noAnimeYet'), style: NipahTheme.body(size: 15, color: NipahColors.textDim)),
             const SizedBox(height: 12),
             GestureDetector(
               onTap: () {
                 setState(() => _tabLoaded[index] = false);
                 _loadTab(index);
               },
-              child: Text('Retry', style: NipahTheme.label(size: 12)),
+              child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 12)),
             ),
           ],
         ),

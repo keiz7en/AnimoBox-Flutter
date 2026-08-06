@@ -17,6 +17,7 @@ void main() async {
   final settings = await getSettings();
   NipahColors.setTheme(settings['theme'] ?? 'Dark');
   NipahColors.setAccent(settings['themeColor'] ?? 'Gold');
+  L10n.setLang(settings['language'] ?? 'English');
 
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
