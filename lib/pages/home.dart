@@ -70,7 +70,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           _tabLoading[index] = false;
           _tabLoaded[index] = true;
           if (index == 0 && data.isNotEmpty && _heroAnime.isEmpty) {
-            _heroAnime = data.take(5).toList();
+            _heroAnime = data.take(15).toList();
             _startHeroTimer();
           }
         });
