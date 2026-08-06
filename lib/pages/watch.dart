@@ -158,11 +158,18 @@ class _WatchPageState extends State<WatchPage> {
     });
     final target = _savedPosition;
     _savedPosition = Duration.zero;
-    _player.play();
     _startPositionSaveTimer();
+    _player.play();
     if (target.inSeconds > 0) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) _player.seek(target);
+      StreamSubscription? sub;
+      sub = _player.stream.buffering.listen((buffering) {
+        if (!buffering && mounted && target.inSeconds > 0) {
+          _player.seek(target);
+          sub?.cancel();
+        }
+      });
+      Future.delayed(const Duration(seconds: 10), () {
+        if (mounted) sub?.cancel();
       });
     }
   }

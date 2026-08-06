@@ -19,7 +19,7 @@ class _NipahLoaderState extends State<NipahLoader>
     super.initState();
     _c = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1400),
     )..repeat();
   }
 
@@ -59,23 +59,22 @@ class _LoaderPainter extends CustomPainter {
     final r = size.width / 2 - 2;
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = size.width * 0.12
+      ..strokeWidth = size.width * 0.1
       ..strokeCap = StrokeCap.square;
 
-    // Track
-    paint.color = color.withValues(alpha: 0.1);
+    paint.color = color.withValues(alpha: 0.08);
     canvas.drawRect(
       Rect.fromCenter(center: c, width: size.width, height: size.height),
       paint,
     );
 
-    // Spinning arc
     final start = value * 6.283;
+    final sweep = 1.2 + (value < 0.5 ? value * 2.4 : (1 - value) * 2.4);
     paint.color = color;
     canvas.drawArc(
       Rect.fromCenter(center: c, width: r * 2, height: r * 2),
       start,
-      1.8,
+      sweep,
       false,
       paint,
     );
@@ -83,6 +82,79 @@ class _LoaderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_LoaderPainter old) => old.value != value;
+}
+
+class NipahPulseLoader extends StatefulWidget {
+  final double size;
+  final Color? color;
+  const NipahPulseLoader({super.key, this.size = 40, this.color});
+
+  @override
+  State<NipahPulseLoader> createState() => _NipahPulseLoaderState();
+}
+
+class _NipahPulseLoaderState extends State<NipahPulseLoader>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _c;
+  late Animation<double> _pulse;
+  late Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+    _pulse = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _c, curve: const Interval(0.0, 0.5, curve: Curves.easeOut)),
+    );
+    _fade = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _c, curve: const Interval(0.0, 0.5, curve: Curves.easeOut)),
+    );
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.color ?? NipahColors.gold;
+    final s = widget.size;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) {
+        final p = _c.value < 0.5 ? _pulse.value : 1.6 - _pulse.value;
+        final f = _c.value < 0.5 ? _fade.value : 1.6 - _fade.value;
+        return Container(
+          width: s * p,
+          height: s * p,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [
+                color.withValues(alpha: 0.6 * f),
+                color.withValues(alpha: 0.0),
+              ],
+            ),
+          ),
+          child: Center(
+            child: Container(
+              width: s * 0.4,
+              height: s * 0.4,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: f),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class NipahDotLoader extends StatefulWidget {
@@ -132,7 +204,10 @@ class _NipahDotLoaderState extends State<NipahDotLoader>
                 width: dotSize * scale,
                 height: dotSize * scale,
                 margin: EdgeInsets.symmetric(horizontal: dotSize * 0.25),
-                color: color.withValues(alpha: 0.4 + scale * 0.6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withValues(alpha: 0.4 + scale * 0.6),
+                ),
               );
             }),
           );

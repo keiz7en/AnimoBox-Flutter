@@ -1,7 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
+import 'package:open_file/open_file.dart';
 import 'api.dart';
 import 'theme/nipah_theme.dart';
 import 'pages/home.dart';
@@ -126,7 +131,20 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
     _controller.forward();
 
-    Future.delayed(const Duration(milliseconds: 1000), () {
+    Future.delayed(const Duration(milliseconds: 1000), () async {
+      if (!mounted) return;
+      try {
+        final info = await PackageInfo.fromPlatform();
+        final update = await checkForUpdate();
+        if (update != null && mounted) {
+          final latest = update['version'] ?? '';
+          if (needsForceUpdate(info.version, latest)) {
+            if (!mounted) return;
+            _showForceUpdateDialog(update);
+            return;
+          }
+        }
+      } catch (_) {}
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
@@ -148,6 +166,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _showForceUpdateDialog(Map<String, dynamic> update) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _ForceUpdateDialog(apkUrl: update['apkUrl'], latestVersion: update['version'] ?? ''),
+    );
   }
 
   @override
@@ -187,6 +213,108 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _ForceUpdateDialog extends StatefulWidget {
+  final String? apkUrl;
+  final String latestVersion;
+  const _ForceUpdateDialog({this.apkUrl, required this.latestVersion});
+
+  @override
+  State<_ForceUpdateDialog> createState() => _ForceUpdateDialogState();
+}
+
+class _ForceUpdateDialogState extends State<_ForceUpdateDialog> {
+  bool _downloading = false;
+  bool _downloadDone = false;
+  double _progress = 0;
+  String _filePath = '';
+
+  Future<void> _downloadApk() async {
+    if (widget.apkUrl == null) return;
+    setState(() { _downloading = true; _progress = 0; });
+    try {
+      String dirPath;
+      try {
+        final dir = await getExternalStorageDirectory();
+        dirPath = dir?.path ?? (await getApplicationDocumentsDirectory()).path;
+      } catch (_) {
+        dirPath = (await getApplicationDocumentsDirectory()).path;
+      }
+      _filePath = '$dirPath/AnimoBox-${widget.latestVersion}.apk';
+      final file = File(_filePath);
+      final request = http.Request('GET', Uri.parse(widget.apkUrl!));
+      final response = await http.Client().send(request);
+      final contentLength = response.contentLength ?? 0;
+      int received = 0;
+      final sink = file.openWrite();
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (contentLength > 0 && mounted) {
+          setState(() => _progress = received / contentLength);
+        }
+      }
+      await sink.close();
+      if (mounted) {
+        setState(() { _downloading = false; _downloadDone = true; _progress = 1; });
+        _installApk();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _downloading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e'), backgroundColor: NipahColors.danger));
+      }
+    }
+  }
+
+  Future<void> _installApk() async {
+    try {
+      final file = File(_filePath);
+      if (await file.exists()) {
+        await OpenFile.open(_filePath);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        backgroundColor: NipahColors.surface,
+        shape: const RoundedRectangleBorder(),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.system_update, color: NipahColors.gold, size: 48),
+            const SizedBox(height: 16),
+            Text(L10n.t('forceUpdate'), style: NipahTheme.heading(size: 20)),
+            const SizedBox(height: 8),
+            Text(L10n.t('forceUpdateMsg'), style: NipahTheme.body(size: 13, color: NipahColors.textDim), textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text('v${widget.latestVersion}', style: NipahTheme.label(size: 11, color: NipahColors.gold)),
+            if (_downloading) ...[
+              const SizedBox(height: 16),
+              LinearProgressIndicator(value: _progress > 0 ? _progress : null,
+                backgroundColor: NipahColors.surface2, valueColor: AlwaysStoppedAnimation<Color>(NipahColors.gold), minHeight: 4),
+              const SizedBox(height: 8),
+              Text('${(_progress * 100).toStringAsFixed(0)}%', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: _downloading ? null : (_downloadDone ? _installApk : _downloadApk),
+            child: Text(
+              _downloadDone ? L10n.t('install') : _downloading ? L10n.t('downloading') : L10n.t('downloadInstall'),
+              style: NipahTheme.label(size: 11, color: NipahColors.gold),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -242,10 +370,15 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        children: _pages,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            child: child,
+          );
+        },
+        child: _pages[_currentIndex],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -264,7 +397,6 @@ class _MainScreenState extends State<MainScreen> {
                   child: GestureDetector(
                     onTap: () {
                       setState(() => _currentIndex = i);
-                      _pageController.jumpToPage(i);
                     },
                     behavior: HitTestBehavior.opaque,
                     child: AnimatedContainer(

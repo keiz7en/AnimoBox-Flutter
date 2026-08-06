@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models.dart';
@@ -23,6 +24,47 @@ class AnimeCard extends StatefulWidget {
 
 class _AnimeCardState extends State<AnimeCard> {
   bool _isHovered = false;
+  Timer? _airTimer;
+  String _airCountdown = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _updateCountdown();
+    if (widget.anime.airingAt != null && widget.anime.airingAt! > 0) {
+      _airTimer = Timer.periodic(const Duration(minutes: 1), (_) => _updateCountdown());
+    }
+  }
+
+  @override
+  void dispose() {
+    _airTimer?.cancel();
+    super.dispose();
+  }
+
+  void _updateCountdown() {
+    if (!mounted) return;
+    final airAt = widget.anime.airingAt;
+    if (airAt == null || airAt <= 0) return;
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final diff = airAt - now;
+    if (diff <= 0) {
+      setState(() => _airCountdown = 'Airing now');
+      return;
+    }
+    final d = diff ~/ 86400;
+    final h = (diff % 86400) ~/ 3600;
+    final m = (diff % 3600) ~/ 60;
+    String text;
+    if (d > 0) {
+      text = '${d}d ${h}h';
+    } else if (h > 0) {
+      text = '${h}h ${m}m';
+    } else {
+      text = '${m}m';
+    }
+    setState(() => _airCountdown = text);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +179,33 @@ class _AnimeCardState extends State<AnimeCard> {
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.08,
                             ),
+                          ),
+                        ),
+                      ),
+                    if (_airCountdown.isNotEmpty)
+                      Positioned(
+                        top: 6,
+                        left: widget.isNew ? 42 : 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _airCountdown == 'Airing now' ? NipahColors.success : NipahColors.gold,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time, size: 8, color: NipahColors.bg),
+                              const SizedBox(width: 3),
+                              Text(
+                                _airCountdown == 'Airing now' ? 'NOW' : _airCountdown,
+                                style: TextStyle(
+                                  color: NipahColors.bg,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.08,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

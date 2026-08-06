@@ -823,3 +823,14 @@ Future<Map<String, dynamic>?> checkForUpdate() async {
     return null;
   }
 }
+
+bool needsForceUpdate(String currentVersion, String latestVersion) {
+  try {
+    final cur = currentVersion.split('+').first.split('.').map(int.parse).toList();
+    final lat = latestVersion.split('+').first.split('.').map(int.parse).toList();
+    if (cur.length < 3 || lat.length < 3) return false;
+    return lat[0] > cur[0];
+  } catch (_) {
+    return false;
+  }
+}
