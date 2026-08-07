@@ -88,6 +88,14 @@ Future<List<Drama>> getNewDramas() async {
   }
 }
 
+Future<List<Drama>> getDramasByCountry(String country) async {
+  try {
+    return await searchDramas(country);
+  } catch (_) {
+    return [];
+  }
+}
+
 Future<DramaEpisodeData?> getDramaEpisodes(int mediaId) async {
   try {
     final url = '$_kissBase/api/sources?id=$mediaId';

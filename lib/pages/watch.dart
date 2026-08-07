@@ -35,6 +35,7 @@ class _WatchPageState extends State<WatchPage> {
   VlcPlayerController? _vlcController;
   bool _useVlc = false;
   bool _vlcError = false;
+  Timer? _vlcFallbackTimer;
   bool _isInitializing = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -57,6 +58,8 @@ class _WatchPageState extends State<WatchPage> {
 
   Duration _lastSavedPosition = Duration.zero;
 
+  int _mkErrorCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +74,8 @@ class _WatchPageState extends State<WatchPage> {
       if (mounted && !_useVlc) {
         setState(() => _isPlaying = playing);
         if (playing) {
+          _mkErrorCount = 0;
+          _vlcFallbackTimer?.cancel();
           _resetHideTimer();
         } else {
           _hideTimer?.cancel();
@@ -106,8 +111,19 @@ class _WatchPageState extends State<WatchPage> {
     });
 
     _player.stream.error.listen((error) {
-      if (mounted && error.isNotEmpty) {
-        debugPrint('Watch: MK stream error: $error');
+      if (mounted && error.isNotEmpty && !_useVlc) {
+        _mkErrorCount++;
+        debugPrint('Watch: MK stream error (count=$_mkErrorCount): $error');
+        if (_mkErrorCount >= 3) {
+          _vlcFallbackTimer?.cancel();
+          debugPrint('Watch: 3+ errors, switching to VLC');
+          _useVlc = true;
+          if (_sources.isNotEmpty && _selectedSourceIndex < _sources.length) {
+            final source = _sources[_selectedSourceIndex];
+            final url = _selectedLinkIndex < source.links.length ? source.links[_selectedLinkIndex].url : '';
+            if (url.isNotEmpty) _initVlcPlayer(url, source);
+          }
+        }
       }
     });
 
@@ -138,6 +154,7 @@ class _WatchPageState extends State<WatchPage> {
   void dispose() {
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
+    _vlcFallbackTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
     _vlcController?.removeListener(_vlcListener);
@@ -273,6 +290,7 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   Future<void> _loadStream() async {
+    _vlcFallbackTimer?.cancel();
     setState(() {
       _isInitializing = true;
       _hasError = false;
@@ -354,6 +372,7 @@ class _WatchPageState extends State<WatchPage> {
       }
       _resetHideTimer();
       _saveWatchHistory();
+      if (!_useVlc) _startVlcFallbackTimer(url, source);
     } catch (e) {
       debugPrint('Watch: MK failed to open $url - $e, trying VLC');
       if (!_useVlc) {
@@ -367,6 +386,20 @@ class _WatchPageState extends State<WatchPage> {
         });
       }
     }
+  }
+
+  void _startVlcFallbackTimer(String url, StreamSource source) {
+    _vlcFallbackTimer?.cancel();
+    _vlcFallbackTimer = Timer(const Duration(seconds: 4), () {
+      if (!mounted || _useVlc) return;
+      final pos = _player.state.position;
+      final dur = _player.state.duration;
+      if (pos.inSeconds < 2 && dur.inSeconds < 2) {
+        debugPrint('Watch: MK no progress after 4s, switching to VLC');
+        _useVlc = true;
+        _initVlcPlayer(url, source);
+      }
+    });
   }
 
   void _initVlcPlayer(String url, StreamSource source) {

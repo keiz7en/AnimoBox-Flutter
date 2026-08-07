@@ -62,6 +62,8 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
+  int _mkErrorCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -73,7 +75,13 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _applyAutoRotate();
 
     _player.stream.playing.listen((playing) {
-      if (mounted && !_useVlc) setState(() => _isPlaying = playing);
+      if (mounted && !_useVlc) {
+        setState(() => _isPlaying = playing);
+        if (playing) {
+          _mkErrorCount = 0;
+          _vlcFallbackTimer?.cancel();
+        }
+      }
     });
 
     _player.stream.position.listen((position) {
@@ -102,8 +110,18 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     });
 
     _player.stream.error.listen((error) {
-      if (mounted && error.isNotEmpty) {
-        debugPrint('DramaWatch: MK stream error: $error');
+      if (mounted && error.isNotEmpty && !_useVlc) {
+        _mkErrorCount++;
+        debugPrint('DramaWatch: MK stream error (count=$_mkErrorCount): $error');
+        if (_mkErrorCount >= 3) {
+          _vlcFallbackTimer?.cancel();
+          debugPrint('DramaWatch: 3+ errors, switching to VLC');
+          _useVlc = true;
+          final url = _sources.isNotEmpty && _selectedSourceIndex < _sources.length
+              ? _sources[_selectedSourceIndex].links[_selectedLinkIndex].url
+              : '';
+          if (url.isNotEmpty) _initVlcPlayer(url);
+        }
       }
     });
 
@@ -132,6 +150,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   void dispose() {
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
+    _vlcFallbackTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
     _vlcController?.removeListener(_vlcListener);
@@ -285,6 +304,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   }
 
   Future<void> _loadStream() async {
+    _vlcFallbackTimer?.cancel();
     setState(() {
       _isInitializing = true;
       _hasError = false;
@@ -350,7 +370,10 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _initializePlayerWithRetry(source.links[_tryLinkIndex].url);
   }
 
+  Timer? _vlcFallbackTimer;
+
   Future<void> _initializePlayerWithRetry(String url) async {
+    _vlcFallbackTimer?.cancel();
     try {
       await _player.stop();
       final headers = <String, String>{'User-Agent': _dramaUA};
@@ -367,6 +390,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         _startPositionSaveTimer();
       }
       _resetHideTimer();
+      if (!_useVlc) _startVlcFallbackTimer(url);
     } catch (e) {
       debugPrint('DramaWatch: MK failed to open $url - $e');
       if (!_useVlc) {
@@ -377,6 +401,20 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         _tryNextSource();
       }
     }
+  }
+
+  void _startVlcFallbackTimer(String url) {
+    _vlcFallbackTimer?.cancel();
+    _vlcFallbackTimer = Timer(const Duration(seconds: 4), () {
+      if (!mounted || _useVlc) return;
+      final pos = _player.state.position;
+      final dur = _player.state.duration;
+      if (pos.inSeconds < 2 && dur.inSeconds < 2) {
+        debugPrint('DramaWatch: MK no progress after 4s, switching to VLC');
+        _useVlc = true;
+        _initVlcPlayer(url);
+      }
+    });
   }
 
   Future<void> _initializePlayer(String url) async {
