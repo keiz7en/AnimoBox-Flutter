@@ -598,9 +598,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         dividerColor: Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         tabs: [
-          Tab(text: isDrama ? 'Popular' : L10n.t('schedule')),
-          Tab(text: isDrama ? 'Recent' : L10n.t('top')),
-          Tab(text: isDrama ? 'New' : L10n.t('latest')),
+          Tab(text: isDrama ? L10n.t('popular') : L10n.t('schedule')),
+          Tab(text: isDrama ? L10n.t('recent') : L10n.t('top')),
+          Tab(text: isDrama ? L10n.t('newDramas') : L10n.t('latest')),
         ],
       ),
     );
@@ -608,7 +608,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _buildSectionHeader() {
     final isDrama = _appMode == 'drama';
-    final labels = isDrama ? ['Popular', 'Recent', 'New'] : [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
+    final labels = isDrama ? [L10n.t('popular'), L10n.t('recent'), L10n.t('newDramas')] : [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
     final idx = _tabController.index;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),

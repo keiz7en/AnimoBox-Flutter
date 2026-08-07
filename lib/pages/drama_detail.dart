@@ -181,6 +181,7 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                       episode: ep.number,
                       mediaId: widget.drama.id,
                       episodes: episodes,
+                      coverImage: widget.drama.poster,
                     ),
                   ),
                 );

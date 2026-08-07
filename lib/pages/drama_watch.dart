@@ -16,6 +16,7 @@ class DramaWatchPage extends StatefulWidget {
   final int episode;
   final int mediaId;
   final List<DramaEpisode> episodes;
+  final String coverImage;
 
   const DramaWatchPage({
     super.key,
@@ -23,6 +24,7 @@ class DramaWatchPage extends StatefulWidget {
     required this.episode,
     required this.mediaId,
     required this.episodes,
+    this.coverImage = '',
   });
 
   @override
@@ -312,9 +314,10 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       'animeTitle': widget.title,
       'episode': _currentEpisode,
       'anilistId': widget.mediaId,
-      'coverImage': '',
+      'coverImage': widget.coverImage,
       'server': '',
       'watchedAt': DateTime.now().millisecondsSinceEpoch,
+      'isDrama': true,
     });
   }
 

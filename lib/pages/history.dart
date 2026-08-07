@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api.dart';
+import '../drama_api.dart';
 import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'anime_detail.dart';
+import 'drama_detail.dart';
+import 'drama_watch.dart';
 import 'watch.dart';
 import 'settings.dart';
 
@@ -36,16 +39,25 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  Future<void> _navigateToAnime(int animeId) async {
+  Future<void> _navigateToAnime(int animeId, {bool isDrama = false}) async {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: NipahLoader(size: 32)),
     );
-    final details = await getAnimeDetailsById(animeId.toString());
-    if (mounted) Navigator.pop(context);
-    if (details != null && mounted) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => AnimeDetailPage(anime: details)));
+    if (isDrama) {
+      final dramas = await searchDramas('');
+      final drama = dramas.firstWhere((d) => d.id == animeId, orElse: () => Drama(id: animeId, title: 'Drama'));
+      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => DramaDetailPage(drama: drama)));
+      }
+    } else {
+      final details = await getAnimeDetailsById(animeId.toString());
+      if (mounted) Navigator.pop(context);
+      if (details != null && mounted) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => AnimeDetailPage(anime: details)));
+      }
     }
   }
 
@@ -139,10 +151,12 @@ class _HistoryPageState extends State<HistoryPage> {
       itemCount: _history.length,
       itemBuilder: (context, index) {
         final item = _history[index];
+        final isDrama = item['isDrama'] == true;
         return _NipahHistoryItem(
           item: item,
           timeAgo: _timeAgo(item['watchedAt'] ?? 0),
-          onTap: () => _navigateToAnime(item['anilistId'] ?? 0),
+          isDrama: isDrama,
+          onTap: () => _navigateToAnime(item['anilistId'] ?? 0, isDrama: isDrama),
           onDelete: () async {
             await removeFromHistory(index);
             _loadHistory();
@@ -162,12 +176,14 @@ String _sanitizeServer(String server) {
 class _NipahHistoryItem extends StatelessWidget {
   final Map<String, dynamic> item;
   final String timeAgo;
+  final bool isDrama;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _NipahHistoryItem({
     required this.item,
     required this.timeAgo,
+    this.isDrama = false,
     required this.onTap,
     required this.onDelete,
   });
@@ -276,21 +292,36 @@ class _NipahHistoryItem extends StatelessWidget {
                   final episode = item['episode'] ?? 1;
                   final animeTitle = item['animeTitle'] ?? '';
                   final coverImage = item['coverImage'] ?? '';
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => WatchPage(
-                        animeTitle: animeTitle,
-                        episode: episode,
-                        anilistId: animeId,
-                        anime: Anime(
-                          id: animeId,
+                  if (isDrama) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DramaWatchPage(
                           title: animeTitle,
+                          episode: episode,
+                          mediaId: animeId,
+                          episodes: [],
                           coverImage: coverImage,
                         ),
                       ),
-                    ),
-                  );
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => WatchPage(
+                          animeTitle: animeTitle,
+                          episode: episode,
+                          anilistId: animeId,
+                          anime: Anime(
+                            id: animeId,
+                            title: animeTitle,
+                            coverImage: coverImage,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
                 },
               ),
               IconButton(
