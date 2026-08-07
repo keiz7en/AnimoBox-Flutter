@@ -47,7 +47,7 @@ class _WatchPageState extends State<WatchPage> {
   bool _showResumeDialog = false;
   String _preferredQuality = 'Auto';
 
-  String get _positionKey => '${widget.anilistId}_ep${widget.episode}';
+  String get _positionKey => '${widget.anilistId}_ep${_currentEpisode}';
 
   Duration _lastSavedPosition = Duration.zero;
 
@@ -171,8 +171,8 @@ class _WatchPageState extends State<WatchPage> {
     _player.play();
     if (target.inSeconds > 0) {
       StreamSubscription? sub;
-      sub = _player.stream.buffering.listen((buffering) {
-        if (!buffering && mounted && target.inSeconds > 0) {
+      sub = _player.stream.position.listen((_) {
+        if (mounted) {
           _player.seek(target);
           sub?.cancel();
         }
