@@ -162,6 +162,7 @@ class _WatchPageState extends State<WatchPage> {
     _saveCurrentPosition();
     _player.dispose();
     _vlcController?.removeListener(_vlcListener);
+    _vlcController?.stopRendererScanning();
     _vlcController?.dispose();
     WakelockPlus.disable();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
@@ -411,7 +412,8 @@ class _WatchPageState extends State<WatchPage> {
 
   Future<void> _initVlcPlayer(String url, StreamSource source) async {
     _vlcController?.removeListener(_vlcListener);
-    _vlcController?.dispose();
+    await _vlcController?.stopRendererScanning();
+    await _vlcController?.dispose();
     _vlcController = null;
 
     if (mounted) setState(() => _isInitializing = true);
@@ -427,10 +429,10 @@ class _WatchPageState extends State<WatchPage> {
         httpOptsList.add(VlcHttpOptions.httpReferrer(headers['Referer']!));
       }
 
-      final ctrl = VlcPlayerController.network(
+      _vlcController = VlcPlayerController.network(
         url,
         hwAcc: HwAcc.disabled,
-        autoPlay: false,
+        autoPlay: true,
         options: VlcPlayerOptions(
           http: VlcHttpOptions(httpOptsList),
           advanced: VlcAdvancedOptions([
@@ -439,17 +441,7 @@ class _WatchPageState extends State<WatchPage> {
         ),
       );
 
-      _vlcController = ctrl;
-      if (mounted) setState(() {});
-
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted || _vlcController != ctrl) return;
-
-      await ctrl.initialize();
-      if (!mounted || _vlcController != ctrl) return;
-
-      ctrl.addListener(_vlcListener);
-      ctrl.play();
+      _vlcController!.addListener(_vlcListener);
 
       if (mounted) {
         setState(() {
@@ -457,7 +449,7 @@ class _WatchPageState extends State<WatchPage> {
           _showControls = true;
         });
         if (_showResumeDialog) {
-          ctrl.pause();
+          _vlcController?.pause();
           setState(() {
             _isPlaying = false;
             _showControls = true;
