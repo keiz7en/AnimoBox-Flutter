@@ -11,6 +11,76 @@ import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'settings.dart';
 
+class _VlcPlayerWidget extends StatefulWidget {
+  final String url;
+  final String userAgent;
+  final String referer;
+  final VoidCallback? onInitialized;
+  final void Function(VlcPlayerController controller)? onControllerReady;
+  const _VlcPlayerWidget({
+    super.key,
+    required this.url,
+    this.userAgent = '',
+    this.referer = '',
+    this.onInitialized,
+    this.onControllerReady,
+  });
+  @override
+  State<_VlcPlayerWidget> createState() => _VlcPlayerWidgetState();
+}
+
+class _VlcPlayerWidgetState extends State<_VlcPlayerWidget> {
+  late final VlcPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final opts = <String>[
+      VlcHttpOptions.httpReconnect(true),
+      VlcHttpOptions.httpContinuous(true),
+    ];
+    if (widget.userAgent.isNotEmpty) {
+      opts.add(VlcHttpOptions.httpUserAgent(widget.userAgent));
+    }
+    if (widget.referer.isNotEmpty) {
+      opts.add(VlcHttpOptions.httpReferrer(widget.referer));
+    }
+
+    _controller = VlcPlayerController.network(
+      widget.url,
+      hwAcc: HwAcc.disabled,
+      autoPlay: true,
+      options: VlcPlayerOptions(
+        http: VlcHttpOptions(opts),
+        advanced: VlcAdvancedOptions([
+          VlcAdvancedOptions.networkCaching(5000),
+        ]),
+      ),
+    );
+
+    _controller.addOnInitListener(() {
+      widget.onControllerReady?.call(_controller);
+      widget.onInitialized?.call();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.stopRendererScanning();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return VlcPlayer(
+      controller: _controller,
+      aspectRatio: MediaQuery.of(context).size.aspectRatio,
+      placeholder: const Center(child: NipahLoader(size: 28)),
+    );
+  }
+}
+
 class WatchPage extends StatefulWidget {
   final String animeTitle;
   final int episode;
@@ -53,6 +123,7 @@ class _WatchPageState extends State<WatchPage> {
   String _preferredQuality = 'Auto';
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  String? _vlcUrl;
 
   String get _positionKey => '${widget.anilistId}_ep${_currentEpisode}';
 
@@ -410,68 +481,34 @@ class _WatchPageState extends State<WatchPage> {
     });
   }
 
-  Future<void> _initVlcPlayer(String url, StreamSource source) async {
+  void _initVlcPlayer(String url, StreamSource source) {
     _vlcController?.removeListener(_vlcListener);
-    await _vlcController?.stopRendererScanning();
-    await _vlcController?.dispose();
+    _vlcController?.stopRendererScanning();
+    _vlcController?.dispose();
     _vlcController = null;
 
-    if (mounted) setState(() => _isInitializing = true);
-
-    try {
-      final headers = _getHeadersForSource(source);
-      final httpOptsList = <String>[
-        VlcHttpOptions.httpReconnect(true),
-        VlcHttpOptions.httpContinuous(true),
-        VlcHttpOptions.httpUserAgent(_defaultUA),
-      ];
-      if (headers['Referer'] != null) {
-        httpOptsList.add(VlcHttpOptions.httpReferrer(headers['Referer']!));
-      }
-
-      _vlcController = VlcPlayerController.network(
-        url,
-        hwAcc: HwAcc.disabled,
-        autoPlay: true,
-        options: VlcPlayerOptions(
-          http: VlcHttpOptions(httpOptsList),
-          advanced: VlcAdvancedOptions([
-            VlcAdvancedOptions.networkCaching(5000),
-          ]),
-        ),
-      );
-
-      _vlcController!.addListener(_vlcListener);
-
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _showControls = true;
-        });
-        if (_showResumeDialog) {
-          _vlcController?.pause();
-          setState(() {
-            _isPlaying = false;
-            _showControls = true;
-          });
-        } else {
-          _isPlaying = true;
-          _startPositionSaveTimer();
-        }
-      }
-      _resetHideTimer();
-      _saveWatchHistory();
-      debugPrint('Watch: VLC player initialized for $url');
-    } catch (e) {
-      debugPrint('Watch: VLC init failed for $url - $e');
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _hasError = true;
-          _errorMessage = 'VLC player failed: $e';
-        });
-      }
+    setState(() {
+      _vlcUrl = url;
+      _isInitializing = false;
+      _showControls = true;
+    });
+    if (_showResumeDialog) {
+      setState(() {
+        _isPlaying = false;
+        _showControls = true;
+      });
+    } else {
+      _isPlaying = true;
+      _startPositionSaveTimer();
     }
+    _resetHideTimer();
+    _saveWatchHistory();
+  }
+
+  void _onVlcReady(VlcPlayerController ctrl) {
+    _vlcController = ctrl;
+    ctrl.addListener(_vlcListener);
+    debugPrint('Watch: VLC player ready');
   }
 
   void _vlcListener() {
@@ -880,11 +917,13 @@ class _WatchPageState extends State<WatchPage> {
         ),
       );
     }
-    if (_useVlc && _vlcController != null) {
-      return VlcPlayer(
-        controller: _vlcController!,
-        aspectRatio: MediaQuery.of(context).size.aspectRatio,
-        placeholder: const Center(child: NipahLoader(size: 28)),
+    if (_useVlc && _vlcUrl != null) {
+      return _VlcPlayerWidget(
+        key: ValueKey(_vlcUrl),
+        url: _vlcUrl!,
+        userAgent: _defaultUA,
+        referer: 'https://www2.animeheaven.ru/',
+        onControllerReady: _onVlcReady,
       );
     }
     return Video(

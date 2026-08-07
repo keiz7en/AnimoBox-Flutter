@@ -14,6 +14,76 @@ import 'settings.dart';
 
 const String _dramaUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
+class _VlcPlayerWidget extends StatefulWidget {
+  final String url;
+  final String userAgent;
+  final String referer;
+  final VoidCallback? onInitialized;
+  final void Function(VlcPlayerController controller)? onControllerReady;
+  const _VlcPlayerWidget({
+    super.key,
+    required this.url,
+    this.userAgent = '',
+    this.referer = '',
+    this.onInitialized,
+    this.onControllerReady,
+  });
+  @override
+  State<_VlcPlayerWidget> createState() => _VlcPlayerWidgetState();
+}
+
+class _VlcPlayerWidgetState extends State<_VlcPlayerWidget> {
+  late final VlcPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final opts = <String>[
+      VlcHttpOptions.httpReconnect(true),
+      VlcHttpOptions.httpContinuous(true),
+    ];
+    if (widget.userAgent.isNotEmpty) {
+      opts.add(VlcHttpOptions.httpUserAgent(widget.userAgent));
+    }
+    if (widget.referer.isNotEmpty) {
+      opts.add(VlcHttpOptions.httpReferrer(widget.referer));
+    }
+
+    _controller = VlcPlayerController.network(
+      widget.url,
+      hwAcc: HwAcc.disabled,
+      autoPlay: true,
+      options: VlcPlayerOptions(
+        http: VlcHttpOptions(opts),
+        advanced: VlcAdvancedOptions([
+          VlcAdvancedOptions.networkCaching(5000),
+        ]),
+      ),
+    );
+
+    _controller.addOnInitListener(() {
+      widget.onControllerReady?.call(_controller);
+      widget.onInitialized?.call();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.stopRendererScanning();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return VlcPlayer(
+      controller: _controller,
+      aspectRatio: MediaQuery.of(context).size.aspectRatio,
+      placeholder: const Center(child: NipahLoader(size: 28)),
+    );
+  }
+}
+
 class DramaWatchPage extends StatefulWidget {
   final String title;
   final int episode;
@@ -59,6 +129,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   int _selectedLinkIndex = 0;
   int _trySourceIndex = 0;
   int _tryLinkIndex = 0;
+  String? _vlcUrl;
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
@@ -452,57 +523,25 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _initVlcPlayer(url);
   }
 
-  Future<void> _initVlcPlayer(String url) async {
+  void _initVlcPlayer(String url) {
     _vlcController?.removeListener(_vlcListener);
-    await _vlcController?.stopRendererScanning();
-    await _vlcController?.dispose();
+    _vlcController?.stopRendererScanning();
+    _vlcController?.dispose();
     _vlcController = null;
 
-    if (mounted) setState(() => _isInitializing = true);
+    setState(() {
+      _vlcUrl = url;
+      _isInitializing = false;
+      _showControls = true;
+    });
+    _resetHideTimer();
+    _saveWatchHistory();
+  }
 
-    try {
-      final httpOptsList = <String>[
-        VlcHttpOptions.httpReconnect(true),
-        VlcHttpOptions.httpContinuous(true),
-        VlcHttpOptions.httpUserAgent(_dramaUA),
-      ];
-      if (url.contains('.m3u8')) {
-        httpOptsList.add(VlcHttpOptions.httpReferrer('https://kissasian.dev/'));
-      }
-
-      _vlcController = VlcPlayerController.network(
-        url,
-        hwAcc: HwAcc.disabled,
-        autoPlay: true,
-        options: VlcPlayerOptions(
-          http: VlcHttpOptions(httpOptsList),
-          advanced: VlcAdvancedOptions([
-            VlcAdvancedOptions.networkCaching(5000),
-          ]),
-        ),
-      );
-
-      _vlcController!.addListener(_vlcListener);
-
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _showControls = true;
-        });
-      }
-      _resetHideTimer();
-      _saveWatchHistory();
-      debugPrint('DramaWatch: VLC player initialized for $url');
-    } catch (e) {
-      debugPrint('DramaWatch: VLC init failed for $url - $e');
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _hasError = true;
-          _errorMessage = 'VLC player failed: $e';
-        });
-      }
-    }
+  void _onVlcReady(VlcPlayerController ctrl) {
+    _vlcController = ctrl;
+    ctrl.addListener(_vlcListener);
+    debugPrint('DramaWatch: VLC player ready');
   }
 
   void _vlcListener() {
@@ -695,11 +734,13 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   }
 
   Widget _buildVideoWidget() {
-    if (_useVlc && _vlcController != null) {
-      return VlcPlayer(
-        controller: _vlcController!,
-        aspectRatio: MediaQuery.of(context).size.aspectRatio,
-        placeholder: const Center(child: NipahLoader(size: 28)),
+    if (_useVlc && _vlcUrl != null) {
+      return _VlcPlayerWidget(
+        key: ValueKey(_vlcUrl),
+        url: _vlcUrl!,
+        userAgent: _dramaUA,
+        referer: 'https://kissasian.dev/',
+        onControllerReady: _onVlcReady,
       );
     }
     return Video(
