@@ -488,7 +488,6 @@ class _SettingsPageState extends State<SettingsPage> {
   String _selectedSection = 'general';
   String _language = 'English';
   String _videoQuality = 'Auto';
-  String _defaultPlayer = 'In-app Player';
   bool _autoRotate = true;
   bool _nsfwFilter = false;
   String _themeColor = 'Gold';
@@ -516,7 +515,6 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         _language = s['language'] ?? 'English';
         _videoQuality = s['videoQuality'] ?? 'Auto';
-        _defaultPlayer = s['player'] ?? 'In-app Player';
         _autoRotate = s['autoRotate'] ?? true;
         _nsfwFilter = s['nsfwFilter'] ?? false;
         _themeColor = s['themeColor'] ?? 'Gold';
@@ -549,34 +547,49 @@ class _SettingsPageState extends State<SettingsPage> {
       barrierDismissible: false,
       builder: (_) => const Center(child: NipahLoader(size: 32)),
     );
-    final update = await checkForUpdate();
-    if (!mounted) return;
-    Navigator.pop(context);
+    try {
+      final update = await checkForUpdate();
+      if (!mounted) return;
+      Navigator.pop(context);
 
-    if (update == null) {
-      showDialog(context: context, builder: (_) => AlertDialog(
-        backgroundColor: NipahColors.surface,
-        shape: const RoundedRectangleBorder(),
-        title: Text('No Update', style: NipahTheme.heading(size: 18)),
-        content: Text('Could not check for updates. Check your internet connection.',
-          style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
-        actions: [TextButton(onPressed: () => Navigator.pop(context),
-          child: Text('OK', style: NipahTheme.body(color: NipahColors.gold)))],
+      if (update == null) {
+        showDialog(context: context, builder: (_) => AlertDialog(
+          backgroundColor: NipahColors.surface,
+          shape: const RoundedRectangleBorder(),
+          title: Text('No Update', style: NipahTheme.heading(size: 18)),
+          content: Text('Could not check for updates. Check your internet connection.',
+            style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
+          actions: [TextButton(onPressed: () => Navigator.pop(context),
+            child: Text('OK', style: NipahTheme.body(color: NipahColors.gold)))],
+        ));
+        return;
+      }
+
+      final latestVersion = update['version'] ?? '';
+      final hasUpdate = latestVersion.isNotEmpty && latestVersion != currentVersion;
+      showDialog(context: context, builder: (_) => _UpdateDialog(
+        hasUpdate: hasUpdate,
+        currentVersion: currentVersion,
+        latestVersion: latestVersion,
+        releaseName: update['name'] ?? '',
+        releaseNotes: update['body'] ?? '',
+        apkUrl: update['apkUrl'],
+        apkSize: update['apkSize'],
       ));
-      return;
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        showDialog(context: context, builder: (_) => AlertDialog(
+          backgroundColor: NipahColors.surface,
+          shape: const RoundedRectangleBorder(),
+          title: Text('Error', style: NipahTheme.heading(size: 18)),
+          content: Text('Failed to check for updates. Please try again.',
+            style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
+          actions: [TextButton(onPressed: () => Navigator.pop(context),
+            child: Text('OK', style: NipahTheme.body(color: NipahColors.gold)))],
+        ));
+      }
     }
-
-    final latestVersion = update['version'] ?? '';
-    final hasUpdate = latestVersion.isNotEmpty && latestVersion != currentVersion;
-    showDialog(context: context, builder: (_) => _UpdateDialog(
-      hasUpdate: hasUpdate,
-      currentVersion: currentVersion,
-      latestVersion: latestVersion,
-      releaseName: update['name'] ?? '',
-      releaseNotes: update['body'] ?? '',
-      apkUrl: update['apkUrl'],
-      apkSize: update['apkSize'],
-    ));
   }
 
   Future<void> _clearCache() async {
@@ -762,11 +775,6 @@ class _SettingsPageState extends State<SettingsPage> {
           child: _buildDropdown(value: _videoQuality, items: ['Auto', '1080p', '720p', '480p', '360p'],
             onChanged: (v) { setState(() => _videoQuality = v ?? 'Auto'); _save('videoQuality', v); })),
         Divider(color: NipahColors.lineSoft),
-        _settingRow(icon: Icons.play_circle, title: L10n.t('preferredPlayer'),
-          subtitle: L10n.t('preferredPlayerSub'),
-          child: _buildDropdown(value: _defaultPlayer, items: ['In-app Player', 'External Player'],
-            onChanged: (v) { setState(() => _defaultPlayer = v ?? 'In-app Player'); _save('player', v); })),
-        Divider(color: NipahColors.lineSoft),
         _settingRow(icon: Icons.info_outline, title: L10n.t('playerEngine'),
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -815,6 +823,33 @@ class _SettingsPageState extends State<SettingsPage> {
         _sectionTitle(L10n.t('appInfo')),
         const SizedBox(height: 12),
         _buildAppInfoCard(),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: NipahTheme.sectionCardDecoration,
+          child: Row(
+            children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]),
+                ),
+                child: Icon(Icons.person, color: NipahColors.bg, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Fayshal', style: NipahTheme.heading(size: 15)),
+                    const SizedBox(height: 2),
+                    Text('Software Developer', style: NipahTheme.body(size: 11, color: NipahColors.gold)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 16),
         _sectionTitle(L10n.t('libraries')),
         const SizedBox(height: 8),

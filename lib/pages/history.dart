@@ -153,6 +153,12 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 }
 
+String _sanitizeServer(String server) {
+  return server
+      .replaceAll(RegExp(r'AnimeHeaven', caseSensitive: false), 'Source')
+      .replaceAll(RegExp(r'AniKoto', caseSensitive: false), 'Source');
+}
+
 class _NipahHistoryItem extends StatelessWidget {
   final Map<String, dynamic> item;
   final String timeAgo;
@@ -253,7 +259,7 @@ class _NipahHistoryItem extends StatelessWidget {
                               ),
                             ),
                             child: Text(
-                              item['server'],
+                              _sanitizeServer(item['server']),
                               style: NipahTheme.label(size: 9, color: NipahColors.gold),
                             ),
                           ),

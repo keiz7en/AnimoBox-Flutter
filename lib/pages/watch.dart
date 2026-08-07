@@ -45,6 +45,7 @@ class _WatchPageState extends State<WatchPage> {
   bool _historySaved = false;
   Duration _savedPosition = Duration.zero;
   bool _showResumeDialog = false;
+  String _preferredQuality = 'Auto';
 
   String get _positionKey => '${widget.anilistId}_ep${widget.episode}';
 
@@ -76,6 +77,12 @@ class _WatchPageState extends State<WatchPage> {
     _player.stream.position.listen((position) {
       if (mounted && _isPlaying && position.inSeconds > 2) {
         _lastSavedPosition = position;
+        if (position.inSeconds % 5 == 0) {
+          final dur = _player.state.duration;
+          if (dur.inSeconds > 5) {
+            savePlaybackPosition(_positionKey, position, dur);
+          }
+        }
       }
     });
 
@@ -89,6 +96,8 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   Future<void> _init() async {
+    final settings = await getSettings();
+    _preferredQuality = settings['videoQuality'] ?? 'Auto';
     await _loadSavedPosition();
     _loadStream();
   }
@@ -252,8 +261,8 @@ class _WatchPageState extends State<WatchPage> {
       }
 
       _selectedSourceIndex = 0;
-      _selectedLinkIndex = 0;
-      await _initializePlayer(sources.first.links.first.url, sources.first);
+      _selectedLinkIndex = _selectBestLink(sources.first);
+      await _initializePlayer(sources.first.links[_selectedLinkIndex].url, sources.first);
     } catch (e) {
       setState(() {
         _isInitializing = false;
@@ -484,6 +493,18 @@ class _WatchPageState extends State<WatchPage> {
     if (newEp < 1) return;
     setState(() => _currentEpisode = newEp);
     _loadStream();
+  }
+
+  int _selectBestLink(StreamSource source) {
+    if (source.links.isEmpty) return 0;
+    if (_preferredQuality == 'Auto') return 0;
+    for (int i = 0; i < source.links.length; i++) {
+      final q = source.links[i].quality.toLowerCase();
+      if (q.contains(_preferredQuality.toLowerCase().replaceAll('p', ''))) {
+        return i;
+      }
+    }
+    return 0;
   }
 
   String _formatDuration(Duration duration) {

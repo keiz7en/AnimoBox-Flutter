@@ -19,7 +19,7 @@ class _NipahLoaderState extends State<NipahLoader>
     super.initState();
     _c = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1500),
     )..repeat();
   }
 
@@ -32,56 +32,63 @@ class _NipahLoaderState extends State<NipahLoader>
   @override
   Widget build(BuildContext context) {
     final color = widget.color ?? NipahColors.gold;
-    final s = widget.size;
+    final w = widget.size * 4;
+    final h = widget.size * 0.18;
     return SizedBox(
-      width: s,
-      height: s,
+      width: w,
+      height: h < 2 ? 2 : h,
       child: AnimatedBuilder(
         animation: _c,
-        builder: (_, __) {
-          return CustomPaint(
-            painter: _LoaderPainter(value: _c.value, color: color),
-          );
-        },
+        builder: (_, __) => CustomPaint(
+          size: Size(w, h < 2 ? 2 : h),
+          painter: _GlossyBarPainter(value: _c.value, color: color),
+        ),
       ),
     );
   }
 }
 
-class _LoaderPainter extends CustomPainter {
+class _GlossyBarPainter extends CustomPainter {
   final double value;
   final Color color;
-  _LoaderPainter({required this.value, required this.color});
+  _GlossyBarPainter({required this.value, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final r = size.width / 2 - 2;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size.width * 0.1
-      ..strokeCap = StrokeCap.square;
+    final rect = Offset.zero & size;
 
-    paint.color = color.withValues(alpha: 0.08);
-    canvas.drawRect(
-      Rect.fromCenter(center: c, width: size.width, height: size.height),
-      paint,
-    );
+    final bg = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          color.withValues(alpha: 0.06),
+          color.withValues(alpha: 0.18),
+          color.withValues(alpha: 0.06),
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, bg);
 
-    final start = value * 6.283;
-    final sweep = 1.2 + (value < 0.5 ? value * 2.4 : (1 - value) * 2.4);
-    paint.color = color;
-    canvas.drawArc(
-      Rect.fromCenter(center: c, width: r * 2, height: r * 2),
-      start,
-      sweep,
-      false,
-      paint,
+    final shineWidth = size.width * 0.35;
+    final cx = size.width * value;
+    final shineRect = Rect.fromLTWH(
+      cx - shineWidth / 2,
+      0,
+      shineWidth,
+      size.height,
     );
+    final shine = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          color.withValues(alpha: 0.0),
+          Color.lerp(color, Colors.white, 0.85)!.withValues(alpha: 0.9),
+          color.withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(shineRect);
+    canvas.drawRect(shineRect, shine);
   }
 
   @override
-  bool shouldRepaint(_LoaderPainter old) => old.value != value;
+  bool shouldRepaint(_GlossyBarPainter old) => old.value != value;
 }
 
 class NipahPulseLoader extends StatefulWidget {
