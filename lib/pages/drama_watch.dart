@@ -483,7 +483,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       _vlcController = ctrl;
       if (mounted) setState(() {});
 
-      await Future.delayed(const Duration(milliseconds: 200));
+      await WidgetsBinding.instance.endOfFrame;
       if (!mounted || _vlcController != ctrl) return;
 
       await ctrl.initialize();
