@@ -26,16 +26,16 @@ Future<List<Drama>> searchDramas(String query) async {
 
 Future<List<Drama>> getRecentDramas() async {
   try {
-    final queries = ['2026 korean drama', '2026 chinese drama', '2026 thai drama'];
+    final queries = ['2026', '2025', 'love', 'romance'];
     final results = <Drama>[];
     for (final q in queries) {
       final dramas = await searchDramas(q);
       for (final d in dramas) {
         if (!results.any((r) => r.id == d.id)) results.add(d);
       }
-      if (results.length >= 20) break;
+      if (results.length >= 30) break;
     }
-    return results.take(20).toList();
+    return results.take(30).toList();
   } catch (_) {
     return [];
   }
@@ -43,16 +43,16 @@ Future<List<Drama>> getRecentDramas() async {
 
 Future<List<Drama>> getPopularDramas() async {
   try {
-    final queries = ['korean drama', 'crash landing', 'squid game', 'boys over flowers'];
+    final queries = ['love', 'heart', 'home', 'family'];
     final results = <Drama>[];
     for (final q in queries) {
       final dramas = await searchDramas(q);
       for (final d in dramas) {
         if (!results.any((r) => r.id == d.id)) results.add(d);
       }
-      if (results.length >= 20) break;
+      if (results.length >= 30) break;
     }
-    return results.take(20).toList();
+    return results.take(30).toList();
   } catch (_) {
     return [];
   }
@@ -60,70 +60,18 @@ Future<List<Drama>> getPopularDramas() async {
 
 Future<List<Drama>> getNewDramas() async {
   try {
-    final queries = ['2025 drama', '2026 drama ongoing'];
+    final queries = ['school', 'king', 'moon', 'sun'];
     final results = <Drama>[];
     for (final q in queries) {
       final dramas = await searchDramas(q);
       for (final d in dramas) {
         if (!results.any((r) => r.id == d.id)) results.add(d);
       }
-      if (results.length >= 20) break;
+      if (results.length >= 30) break;
     }
-    return results.take(20).toList();
+    return results.take(30).toList();
   } catch (_) {
     return [];
-  }
-}
-
-Future<DramaDetail?> getDramaDetail(String slug) async {
-  try {
-    final url = '$_kissBase/tv-series/$slug';
-    final res = await http.get(Uri.parse(url), headers: _headers()).timeout(const Duration(seconds: 8));
-    if (res.statusCode != 200) return null;
-    return _parseDramaPage(res.body, slug);
-  } catch (_) {
-    return null;
-  }
-}
-
-DramaDetail? _parseDramaPage(String html, String slug) {
-  try {
-    final titleMatch = RegExp(r'"title"\s*:\s*"([^"]+)"').firstMatch(html);
-    final posterMatch = RegExp(r'"poster"\s*:\s*"([^"]+)"').firstMatch(html);
-    final backdropMatch = RegExp(r'"backdrop"\s*:\s*"([^"]+)"').firstMatch(html);
-    final descMatch = RegExp(r'"description"\s*:\s*"([^"]+)"').firstMatch(html);
-    final episodesMatch = RegExp(r'"episodes"\s*:\s*(\d+)').firstMatch(html);
-    final statusMatch = RegExp(r'"status"\s*:\s*"([^"]+)"').firstMatch(html);
-    final ratingMatch = RegExp(r'"rating"\s*:\s*([\d.]+)').firstMatch(html);
-    final countryMatch = RegExp(r'"country"\s*:\s*"([^"]+)"').firstMatch(html);
-    final durationMatch = RegExp(r'"duration"\s*:\s*"([^"]+)"').firstMatch(html);
-    final yearMatch = RegExp(r'"year"\s*:\s*"([^"]+)"').firstMatch(html);
-    final idMatch = RegExp(r'"id"\s*:\s*(\d+)').firstMatch(html);
-    final genresMatch = RegExp(r'"genres"\s*:\s*\[([^\]]*)\]').firstMatch(html);
-    final serverEpMatch = RegExp(r'"serverEpisodesCount"\s*:\s*(\d+)').firstMatch(html);
-
-    final genresRaw = genresMatch?.group(1) ?? '';
-    final genres = genresRaw.split(',').map((g) => g.trim().replaceAll('"', '')).where((g) => g.isNotEmpty).toList();
-
-    final epCount = int.tryParse(episodesMatch?.group(1) ?? serverEpMatch?.group(1) ?? '0') ?? 0;
-
-    return DramaDetail(
-      id: int.tryParse(idMatch?.group(1) ?? '0') ?? slug.hashCode,
-      title: titleMatch?.group(1) ?? '',
-      slug: slug,
-      poster: posterMatch?.group(1) ?? '',
-      backdrop: backdropMatch?.group(1) ?? '',
-      description: descMatch?.group(1) ?? '',
-      episodes: epCount,
-      status: statusMatch?.group(1) ?? '',
-      rating: double.tryParse(ratingMatch?.group(1) ?? '0') ?? 0,
-      country: countryMatch?.group(1) ?? '',
-      duration: durationMatch?.group(1) ?? '',
-      year: yearMatch?.group(1) ?? '',
-      genres: genres,
-    );
-  } catch (_) {
-    return null;
   }
 }
 

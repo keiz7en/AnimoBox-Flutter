@@ -15,7 +15,6 @@ class DramaDetailPage extends StatefulWidget {
 }
 
 class _DramaDetailPageState extends State<DramaDetailPage> {
-  DramaDetail? _detail;
   DramaEpisodeData? _episodeData;
   bool _isLoading = true;
 
@@ -26,24 +25,18 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
   }
 
   Future<void> _loadDetail() async {
-    final detail = await getDramaDetail(widget.drama.slug);
-    if (detail != null && mounted) {
-      setState(() => _detail = detail);
-      final epData = await getDramaEpisodes(detail.id);
-      if (mounted) {
-        setState(() {
-          _episodeData = epData;
-          _isLoading = false;
-        });
-      }
-    } else if (mounted) {
-      setState(() => _isLoading = false);
+    final epData = await getDramaEpisodes(widget.drama.id);
+    if (mounted) {
+      setState(() {
+        _episodeData = epData;
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final drama = _detail ?? widget.drama;
+    final drama = widget.drama;
 
     return Scaffold(
       backgroundColor: NipahColors.bg,
@@ -186,7 +179,7 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                     builder: (_) => DramaWatchPage(
                       title: widget.drama.title,
                       episode: ep.number,
-                      mediaId: _detail?.id ?? widget.drama.id,
+                      mediaId: widget.drama.id,
                       episodes: episodes,
                     ),
                   ),

@@ -275,7 +275,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       'episode': _currentEpisode,
       'anilistId': widget.mediaId,
       'coverImage': '',
-      'server': 'KissAsian',
+      'server': '',
       'watchedAt': DateTime.now().millisecondsSinceEpoch,
     });
   }
