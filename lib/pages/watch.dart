@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../api.dart';
 import '../models.dart';
@@ -31,6 +32,9 @@ class WatchPage extends StatefulWidget {
 class _WatchPageState extends State<WatchPage> {
   late final Player _player;
   late final VideoController _videoController;
+  VlcPlayerController? _vlcController;
+  bool _useVlc = false;
+  bool _vlcError = false;
   bool _isInitializing = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -46,6 +50,8 @@ class _WatchPageState extends State<WatchPage> {
   Duration _savedPosition = Duration.zero;
   bool _showResumeDialog = false;
   String _preferredQuality = 'Auto';
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
 
   String get _positionKey => '${widget.anilistId}_ep${_currentEpisode}';
 
@@ -62,7 +68,7 @@ class _WatchPageState extends State<WatchPage> {
     _applyAutoRotate();
 
     _player.stream.playing.listen((playing) {
-      if (mounted) {
+      if (mounted && !_useVlc) {
         setState(() => _isPlaying = playing);
         if (playing) {
           _resetHideTimer();
@@ -75,20 +81,35 @@ class _WatchPageState extends State<WatchPage> {
     });
 
     _player.stream.position.listen((position) {
-      if (mounted && _isPlaying && position.inSeconds > 2) {
-        _lastSavedPosition = position;
-        if (position.inSeconds % 5 == 0) {
-          final dur = _player.state.duration;
-          if (dur.inSeconds > 5) {
-            savePlaybackPosition(_positionKey, position, dur);
+      if (mounted && !_useVlc) {
+        setState(() => _position = position);
+        if (_isPlaying && position.inSeconds > 2) {
+          _lastSavedPosition = position;
+          if (position.inSeconds % 5 == 0) {
+            final dur = _player.state.duration;
+            if (dur.inSeconds > 5) {
+              savePlaybackPosition(_positionKey, position, dur);
+            }
           }
         }
       }
     });
 
+    _player.stream.duration.listen((duration) {
+      if (mounted && !_useVlc) setState(() => _duration = duration);
+    });
+
     _player.stream.completed.listen((completed) {
       if (completed && mounted) {
         clearPlaybackPosition(_positionKey);
+      }
+    });
+
+    _player.stream.error.listen((error) {
+      if (mounted && error.isNotEmpty && !_useVlc) {
+        debugPrint('Watch: MK error: $error - trying VLC fallback');
+        _useVlc = true;
+        _tryVlcForCurrentSource();
       }
     });
 
@@ -121,6 +142,8 @@ class _WatchPageState extends State<WatchPage> {
     _positionSaveTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
+    _vlcController?.removeListener(_vlcListener);
+    _vlcController?.dispose();
     WakelockPlus.disable();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -146,8 +169,15 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   void _saveCurrentPosition() {
-    final pos = _player.state.position;
-    final dur = _player.state.duration;
+    Duration pos;
+    Duration dur;
+    if (_useVlc && _vlcController != null) {
+      pos = _vlcController!.value.position;
+      dur = _vlcController!.value.duration;
+    } else {
+      pos = _player.state.position;
+      dur = _player.state.duration;
+    }
     final savePos = pos.inSeconds > 2 ? pos : _lastSavedPosition;
     if (savePos.inSeconds > 2 && dur.inSeconds > 5) {
       savePlaybackPosition(_positionKey, savePos, dur);
@@ -168,18 +198,27 @@ class _WatchPageState extends State<WatchPage> {
     final target = _savedPosition;
     _savedPosition = Duration.zero;
     _startPositionSaveTimer();
-    _player.play();
-    if (target.inSeconds > 0) {
-      StreamSubscription? sub;
-      sub = _player.stream.position.listen((_) {
-        if (mounted) {
-          _player.seek(target);
-          sub?.cancel();
-        }
-      });
-      Future.delayed(const Duration(seconds: 10), () {
-        if (mounted) sub?.cancel();
-      });
+    if (_useVlc) {
+      _vlcController?.play();
+      if (target.inSeconds > 0) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _vlcController?.seekTo(target);
+        });
+      }
+    } else {
+      _player.play();
+      if (target.inSeconds > 0) {
+        StreamSubscription? sub;
+        sub = _player.stream.position.listen((_) {
+          if (mounted) {
+            _player.seek(target);
+            sub?.cancel();
+          }
+        });
+        Future.delayed(const Duration(seconds: 10), () {
+          if (mounted) sub?.cancel();
+        });
+      }
     }
   }
 
@@ -188,7 +227,11 @@ class _WatchPageState extends State<WatchPage> {
     setState(() {
       _showResumeDialog = false;
     });
-    _player.play();
+    if (_useVlc) {
+      _vlcController?.play();
+    } else {
+      _player.play();
+    }
     _startPositionSaveTimer();
   }
 
@@ -236,6 +279,8 @@ class _WatchPageState extends State<WatchPage> {
       _isInitializing = true;
       _hasError = false;
       _historySaved = false;
+      _useVlc = false;
+      _vlcError = false;
     });
 
     final titleVariants = widget.anime?.allTitles;
@@ -282,6 +327,11 @@ class _WatchPageState extends State<WatchPage> {
       return;
     }
 
+    if (_useVlc) {
+      _initVlcPlayer(url, source);
+      return;
+    }
+
     try {
       await _player.stop();
       final headers = _getHeadersForSource(source);
@@ -315,6 +365,99 @@ class _WatchPageState extends State<WatchPage> {
     }
   }
 
+  void _tryVlcForCurrentSource() {
+    if (_sources.isEmpty) return;
+    final source = _sources[_selectedSourceIndex];
+    final url = source.links[_selectedLinkIndex].url;
+    _initVlcPlayer(url, source);
+  }
+
+  void _initVlcPlayer(String url, StreamSource source) {
+    _vlcController?.removeListener(_vlcListener);
+    _vlcController?.dispose();
+
+    final headers = _getHeadersForSource(source);
+    final httpOptsList = <String>[
+      VlcHttpOptions.httpReconnect(true),
+      VlcHttpOptions.httpContinuous(true),
+      VlcHttpOptions.httpUserAgent(_defaultUA),
+    ];
+    if (headers['Referer'] != null) {
+      httpOptsList.add(VlcHttpOptions.httpReferrer(headers['Referer']!));
+    }
+
+    _vlcController = VlcPlayerController.network(
+      url,
+      hwAcc: HwAcc.full,
+      autoPlay: true,
+      options: VlcPlayerOptions(
+        http: VlcHttpOptions(httpOptsList),
+        advanced: VlcAdvancedOptions([
+          VlcAdvancedOptions.networkCaching(5000),
+        ]),
+      ),
+    );
+
+    _vlcController!.addListener(_vlcListener);
+
+    if (mounted) {
+      setState(() {
+        _isInitializing = false;
+        _showControls = true;
+      });
+      if (_showResumeDialog) {
+        _vlcController?.pause();
+        setState(() {
+          _isPlaying = false;
+          _showControls = true;
+        });
+      } else {
+        _isPlaying = true;
+        _startPositionSaveTimer();
+      }
+    }
+    _resetHideTimer();
+    _saveWatchHistory();
+    debugPrint('Watch: VLC player initialized for $url');
+  }
+
+  void _vlcListener() {
+    if (!mounted || _vlcController == null) return;
+    final v = _vlcController!.value;
+
+    if (mounted) {
+      setState(() {
+        _isPlaying = v.isPlaying;
+        _position = v.position;
+        _duration = v.duration;
+      });
+    }
+
+    if (v.isPlaying) {
+      _resetHideTimer();
+    } else if (!_isPlaying) {
+      _hideTimer?.cancel();
+      if (_showControls == false) setState(() => _showControls = true);
+      _saveCurrentPosition();
+    }
+
+    if (_isPlaying && _position.inSeconds > 2) {
+      _lastSavedPosition = _position;
+      if (_position.inSeconds % 5 == 0 && _duration.inSeconds > 5) {
+        savePlaybackPosition(_positionKey, _position, _duration);
+      }
+    }
+
+    if (v.isEnded && mounted) {
+      clearPlaybackPosition(_positionKey);
+    }
+
+    if (v.hasError && mounted && !_vlcError) {
+      _vlcError = true;
+      debugPrint('Watch: VLC error: ${v.errorDescription}');
+    }
+  }
+
   void _saveWatchHistory() {
     if (_historySaved) return;
     _historySaved = true;
@@ -329,20 +472,38 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   void _togglePlayPause() {
-    _player.playOrPause();
+    if (_useVlc) {
+      final v = _vlcController?.value;
+      if (v != null && v.isPlaying) {
+        _vlcController?.pause();
+      } else {
+        _vlcController?.play();
+      }
+    } else {
+      _player.playOrPause();
+    }
     _showControlsBriefly();
   }
 
   void _seekForward() {
-    final pos = _player.state.position;
-    _player.seek(pos + const Duration(seconds: 10));
+    final newPos = _position + const Duration(seconds: 10);
+    if (_useVlc) {
+      _vlcController?.seekTo(newPos);
+    } else {
+      _player.seek(newPos);
+    }
     _showControlsBriefly();
   }
 
   void _seekBackward() {
-    final pos = _player.state.position;
+    final pos = _position;
     final newPos = pos - const Duration(seconds: 10);
-    _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
+    final target = newPos < Duration.zero ? Duration.zero : newPos;
+    if (_useVlc) {
+      _vlcController?.seekTo(target);
+    } else {
+      _player.seek(target);
+    }
     _showControlsBriefly();
   }
 
@@ -491,6 +652,7 @@ class _WatchPageState extends State<WatchPage> {
   void _changeEpisode(int delta) {
     final newEp = _currentEpisode + delta;
     if (newEp < 1) return;
+    _saveCurrentPosition();
     setState(() => _currentEpisode = newEp);
     _loadStream();
   }
@@ -664,6 +826,13 @@ class _WatchPageState extends State<WatchPage> {
         ),
       );
     }
+    if (_useVlc && _vlcController != null) {
+      return VlcPlayer(
+        controller: _vlcController!,
+        aspectRatio: MediaQuery.of(context).size.aspectRatio,
+        placeholder: const Center(child: NipahLoader(size: 28)),
+      );
+    }
     return Video(
       controller: _videoController,
       controls: NoVideoControls,
@@ -717,9 +886,24 @@ class _WatchPageState extends State<WatchPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                '${L10n.t('episode')} $_currentEpisode',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                  Row(
+                    children: [
+                      Text(
+                        '${L10n.t('episode')} $_currentEpisode',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                      ),
+                      if (_useVlc) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: NipahColors.gold.withValues(alpha: 0.2),
+                            border: Border.all(color: NipahColors.gold.withValues(alpha: 0.4)),
+                          ),
+                          child: Text('VLC', style: NipahTheme.label(size: 8, color: NipahColors.gold)),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -796,9 +980,6 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   Widget _buildBottomBar() {
-    final position = _player.state.position;
-    final duration = _player.state.duration;
-
     return SafeArea(
       child: GestureDetector(
         onTap: () {},
@@ -816,12 +997,17 @@ class _WatchPageState extends State<WatchPage> {
                   overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
                 ),
                 child: Slider(
-                  value: duration.inMilliseconds > 0
-                      ? position.inMilliseconds.toDouble().clamp(0.0, duration.inMilliseconds.toDouble())
+                  value: _duration.inMilliseconds > 0
+                      ? _position.inMilliseconds.toDouble().clamp(0.0, _duration.inMilliseconds.toDouble())
                       : 0.0,
-                  max: duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0,
+                  max: _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
                   onChanged: (value) {
-                    _player.seek(Duration(milliseconds: value.toInt()));
+                    final target = Duration(milliseconds: value.toInt());
+                    if (_useVlc) {
+                      _vlcController?.seekTo(target);
+                    } else {
+                      _player.seek(target);
+                    }
                     _showControlsBriefly();
                   },
                 ),
@@ -829,7 +1015,7 @@ class _WatchPageState extends State<WatchPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(_formatDuration(position), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  Text(_formatDuration(_position), style: const TextStyle(color: Colors.white, fontSize: 12)),
                   Row(
                     children: [
                       IconButton(
@@ -846,7 +1032,7 @@ class _WatchPageState extends State<WatchPage> {
                       ),
                     ],
                   ),
-                  Text(_formatDuration(duration), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  Text(_formatDuration(_duration), style: const TextStyle(color: Colors.white, fontSize: 12)),
                 ],
               ),
             ],
