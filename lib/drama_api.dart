@@ -11,6 +11,13 @@ Map<String, String> _headers() => {
   'Referer': _kissBase,
 };
 
+String _parseVideoUrl(String raw) {
+  if (raw.isEmpty) return raw;
+  // Format can be: "url|lang|subtitleUrl" or just "url"
+  final parts = raw.split('|');
+  return parts.first.trim();
+}
+
 Future<List<Drama>> searchDramas(String query) async {
   try {
     final url = '$_kissBase/api/search?q=${Uri.encodeComponent(query)}';
@@ -103,7 +110,7 @@ Future<String?> getDramaVideoUrl(int mediaId, int episodeNumber) async {
       for (final ep in topEpisodes) {
         if (ep['number'] == episodeNumber) {
           final videoUrl = ep['videoUrl'] as String?;
-          if (videoUrl != null && videoUrl.isNotEmpty) return videoUrl;
+          if (videoUrl != null && videoUrl.isNotEmpty) return _parseVideoUrl(videoUrl);
         }
       }
     }
@@ -117,7 +124,7 @@ Future<String?> getDramaVideoUrl(int mediaId, int episodeNumber) async {
       for (final ep in episodes) {
         if (ep['number'] == episodeNumber) {
           final videoUrl = ep['url'] as String?;
-          if (videoUrl != null && videoUrl.isNotEmpty) return videoUrl;
+          if (videoUrl != null && videoUrl.isNotEmpty) return _parseVideoUrl(videoUrl);
         }
       }
     }
@@ -143,7 +150,7 @@ Future<List<StreamSource>> getDramaStreamSources(int mediaId, int episodeNumber)
         final videoUrl = ep['videoUrl'] as String?;
         final epNum = ep['number'] ?? episodeNumber;
         if (videoUrl != null && videoUrl.isNotEmpty) {
-          links.add(StreamLink(url: videoUrl, quality: 'Ep $epNum'));
+          links.add(StreamLink(url: _parseVideoUrl(videoUrl), quality: 'Ep $epNum'));
         }
       }
       if (links.isNotEmpty) {
@@ -163,7 +170,7 @@ Future<List<StreamSource>> getDramaStreamSources(int mediaId, int episodeNumber)
           final videoUrl = ep['url'] as String?;
           final epNum = ep['number'] ?? episodeNumber;
           if (videoUrl != null && videoUrl.isNotEmpty) {
-            links.add(StreamLink(url: videoUrl, quality: 'Ep $epNum'));
+            links.add(StreamLink(url: _parseVideoUrl(videoUrl), quality: 'Ep $epNum'));
           }
         }
         if (links.isNotEmpty) {
