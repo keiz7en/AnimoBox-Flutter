@@ -471,7 +471,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       final ctrl = VlcPlayerController.network(
         url,
         hwAcc: HwAcc.disabled,
-        autoPlay: true,
+        autoPlay: false,
         options: VlcPlayerOptions(
           http: VlcHttpOptions(httpOptsList),
           advanced: VlcAdvancedOptions([
@@ -480,9 +480,17 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         ),
       );
 
-      await ctrl.initialize();
-      ctrl.addListener(_vlcListener);
       _vlcController = ctrl;
+      if (mounted) setState(() {});
+
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (!mounted || _vlcController != ctrl) return;
+
+      await ctrl.initialize();
+      if (!mounted || _vlcController != ctrl) return;
+
+      ctrl.addListener(_vlcListener);
+      ctrl.play();
 
       if (mounted) {
         setState(() {

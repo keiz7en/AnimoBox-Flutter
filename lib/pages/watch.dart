@@ -430,7 +430,7 @@ class _WatchPageState extends State<WatchPage> {
       final ctrl = VlcPlayerController.network(
         url,
         hwAcc: HwAcc.disabled,
-        autoPlay: true,
+        autoPlay: false,
         options: VlcPlayerOptions(
           http: VlcHttpOptions(httpOptsList),
           advanced: VlcAdvancedOptions([
@@ -439,9 +439,17 @@ class _WatchPageState extends State<WatchPage> {
         ),
       );
 
-      await ctrl.initialize();
-      ctrl.addListener(_vlcListener);
       _vlcController = ctrl;
+      if (mounted) setState(() {});
+
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (!mounted || _vlcController != ctrl) return;
+
+      await ctrl.initialize();
+      if (!mounted || _vlcController != ctrl) return;
+
+      ctrl.addListener(_vlcListener);
+      ctrl.play();
 
       if (mounted) {
         setState(() {
@@ -449,7 +457,7 @@ class _WatchPageState extends State<WatchPage> {
           _showControls = true;
         });
         if (_showResumeDialog) {
-          _vlcController?.pause();
+          ctrl.pause();
           setState(() {
             _isPlaying = false;
             _showControls = true;
