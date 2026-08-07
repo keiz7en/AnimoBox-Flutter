@@ -468,7 +468,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         httpOptsList.add(VlcHttpOptions.httpReferrer('https://kissasian.dev/'));
       }
 
-      _vlcController = VlcPlayerController.network(
+      final ctrl = VlcPlayerController.network(
         url,
         hwAcc: HwAcc.disabled,
         autoPlay: true,
@@ -480,8 +480,9 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         ),
       );
 
-      await _vlcController!.initialize();
-      _vlcController!.addListener(_vlcListener);
+      await ctrl.initialize();
+      ctrl.addListener(_vlcListener);
+      _vlcController = ctrl;
 
       if (mounted) {
         setState(() {

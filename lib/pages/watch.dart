@@ -427,7 +427,7 @@ class _WatchPageState extends State<WatchPage> {
         httpOptsList.add(VlcHttpOptions.httpReferrer(headers['Referer']!));
       }
 
-      _vlcController = VlcPlayerController.network(
+      final ctrl = VlcPlayerController.network(
         url,
         hwAcc: HwAcc.disabled,
         autoPlay: true,
@@ -439,8 +439,9 @@ class _WatchPageState extends State<WatchPage> {
         ),
       );
 
-      await _vlcController!.initialize();
-      _vlcController!.addListener(_vlcListener);
+      await ctrl.initialize();
+      ctrl.addListener(_vlcListener);
+      _vlcController = ctrl;
 
       if (mounted) {
         setState(() {
