@@ -1,0 +1,526 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import '../api.dart';
+import '../drama_api.dart';
+import '../models.dart';
+import '../theme/nipah_theme.dart';
+import '../widgets/nipah_loader.dart';
+import 'settings.dart';
+
+class DramaWatchPage extends StatefulWidget {
+  final String title;
+  final int episode;
+  final int mediaId;
+  final List<DramaEpisode> episodes;
+
+  const DramaWatchPage({
+    super.key,
+    required this.title,
+    required this.episode,
+    required this.mediaId,
+    required this.episodes,
+  });
+
+  @override
+  State<DramaWatchPage> createState() => _DramaWatchPageState();
+}
+
+class _DramaWatchPageState extends State<DramaWatchPage> {
+  late final Player _player;
+  late final VideoController _videoController;
+  bool _isInitializing = true;
+  bool _hasError = false;
+  String _errorMessage = '';
+  bool _showControls = true;
+  bool _isPlaying = false;
+  int _currentEpisode = 1;
+  Timer? _hideTimer;
+  Timer? _positionSaveTimer;
+  bool _historySaved = false;
+  Duration _savedPosition = Duration.zero;
+  bool _showResumeDialog = false;
+  Duration _lastSavedPosition = Duration.zero;
+
+  String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
+
+  @override
+  void initState() {
+    super.initState();
+    _currentEpisode = widget.episode;
+    _player = Player();
+    _videoController = VideoController(_player);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    WakelockPlus.enable();
+    _applyAutoRotate();
+
+    _player.stream.playing.listen((playing) {
+      if (mounted) {
+        setState(() => _isPlaying = playing);
+        if (playing) {
+          _resetHideTimer();
+        } else {
+          _hideTimer?.cancel();
+          setState(() => _showControls = true);
+          _saveCurrentPosition();
+        }
+      }
+    });
+
+    _player.stream.position.listen((position) {
+      if (mounted && _isPlaying && position.inSeconds > 2) {
+        _lastSavedPosition = position;
+        if (position.inSeconds % 5 == 0) {
+          final dur = _player.state.duration;
+          if (dur.inSeconds > 5) {
+            savePlaybackPosition(_positionKey, position, dur);
+          }
+        }
+      }
+    });
+
+    _player.stream.completed.listen((completed) {
+      if (completed && mounted) {
+        clearPlaybackPosition(_positionKey);
+      }
+    });
+
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadSavedPosition();
+    _loadStream();
+  }
+
+  Future<void> _applyAutoRotate() async {
+    final settings = await getSettings();
+    final autoRotate = settings['autoRotate'] ?? true;
+    if (autoRotate) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    }
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _positionSaveTimer?.cancel();
+    _saveCurrentPosition();
+    _player.dispose();
+    WakelockPlus.disable();
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  Future<void> _loadSavedPosition() async {
+    final saved = await getPlaybackPosition(_positionKey);
+    if (saved != null && mounted) {
+      final posMs = saved['position'] as int? ?? 0;
+      final durMs = saved['duration'] as int? ?? 0;
+      if (posMs > 0 && durMs > 0) {
+        final pos = Duration(milliseconds: posMs);
+        final dur = Duration(milliseconds: durMs);
+        if (dur.inSeconds > 5 && pos.inSeconds > 2) {
+          setState(() {
+            _savedPosition = pos;
+            _showResumeDialog = true;
+          });
+        }
+      }
+    }
+  }
+
+  void _saveCurrentPosition() {
+    final pos = _player.state.position;
+    final dur = _player.state.duration;
+    final savePos = pos.inSeconds > 2 ? pos : _lastSavedPosition;
+    if (savePos.inSeconds > 2 && dur.inSeconds > 5) {
+      savePlaybackPosition(_positionKey, savePos, dur);
+    }
+  }
+
+  void _startPositionSaveTimer() {
+    _positionSaveTimer?.cancel();
+    _positionSaveTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_isPlaying) _saveCurrentPosition();
+    });
+  }
+
+  void _resumeFromPosition() {
+    setState(() {
+      _showResumeDialog = false;
+    });
+    final target = _savedPosition;
+    _savedPosition = Duration.zero;
+    _startPositionSaveTimer();
+    _player.play();
+    if (target.inSeconds > 0) {
+      StreamSubscription? sub;
+      sub = _player.stream.position.listen((_) {
+        if (mounted) {
+          _player.seek(target);
+          sub?.cancel();
+        }
+      });
+      Future.delayed(const Duration(seconds: 10), () {
+        if (mounted) sub?.cancel();
+      });
+    }
+  }
+
+  void _startFromBeginning() {
+    clearPlaybackPosition(_positionKey);
+    setState(() {
+      _showResumeDialog = false;
+    });
+    _player.play();
+    _startPositionSaveTimer();
+  }
+
+  void _resetHideTimer() {
+    _hideTimer?.cancel();
+    if (_isPlaying) {
+      _hideTimer = Timer(const Duration(seconds: 5), () {
+        if (mounted && _isPlaying) {
+          setState(() => _showControls = false);
+        }
+      });
+    }
+  }
+
+  void _toggleControls() {
+    setState(() => _showControls = !_showControls);
+    if (_showControls) _resetHideTimer();
+  }
+
+  void _showControlsBriefly() {
+    setState(() => _showControls = true);
+    _resetHideTimer();
+  }
+
+  Future<void> _loadStream() async {
+    setState(() {
+      _isInitializing = true;
+      _hasError = false;
+      _historySaved = false;
+    });
+
+    try {
+      final videoUrl = await getDramaVideoUrl(widget.mediaId, _currentEpisode);
+      if (videoUrl == null || videoUrl.isEmpty) {
+        setState(() {
+          _isInitializing = false;
+          _hasError = true;
+          _errorMessage = 'No video source found.';
+        });
+        return;
+      }
+      await _initializePlayer(videoUrl);
+    } catch (e) {
+      setState(() {
+        _isInitializing = false;
+        _hasError = true;
+        _errorMessage = 'Failed to load stream: $e';
+      });
+    }
+  }
+
+  Future<void> _initializePlayer(String url) async {
+    try {
+      await _player.stop();
+      await _player.open(
+        Media(url, httpHeaders: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}),
+      );
+
+      if (_showResumeDialog) {
+        await _player.pause();
+        setState(() {
+          _isInitializing = false;
+          _isPlaying = false;
+          _showControls = true;
+        });
+      } else {
+        setState(() {
+          _isInitializing = false;
+          _isPlaying = true;
+          _showControls = true;
+        });
+        _startPositionSaveTimer();
+      }
+      _resetHideTimer();
+      _saveWatchHistory();
+    } catch (e) {
+      setState(() {
+        _isInitializing = false;
+        _hasError = true;
+        _errorMessage = 'Failed to load video: $e';
+      });
+    }
+  }
+
+  void _saveWatchHistory() {
+    if (_historySaved) return;
+    _historySaved = true;
+    saveToHistory({
+      'animeTitle': widget.title,
+      'episode': _currentEpisode,
+      'anilistId': widget.mediaId,
+      'coverImage': '',
+      'server': 'KissAsian',
+      'watchedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  void _changeEpisode(int delta) {
+    final newEp = _currentEpisode + delta;
+    if (newEp < 1 || newEp > widget.episodes.length) return;
+    _saveCurrentPosition();
+    setState(() => _currentEpisode = newEp);
+    _loadStream();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _toggleControls,
+              child: Video(
+                controller: _videoController,
+                controls: NoVideoControls,
+              ),
+            ),
+          ),
+          if (_isInitializing)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black,
+                child: const Center(child: NipahLoader(size: 28)),
+              ),
+            ),
+          if (_hasError)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline, color: NipahColors.danger, size: 48),
+                      const SizedBox(height: 16),
+                      Text(_errorMessage, style: NipahTheme.body(size: 14, color: NipahColors.textDim)),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: _loadStream,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                          decoration: NipahTheme.goldButtonDecoration,
+                          child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 12, color: NipahColors.bg)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (_showResumeDialog) _buildResumeDialog(),
+          AnimatedOpacity(
+            opacity: _showControls ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            child: IgnorePointer(
+              ignoring: !_showControls,
+              child: _buildOverlayControls(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResumeDialog() {
+    final pos = _savedPosition;
+    final h = pos.inHours;
+    final m = (pos.inMinutes.remainder(60)).toString().padLeft(2, '0');
+    final s = (pos.inSeconds.remainder(60)).toString().padLeft(2, '0');
+    final timeStr = h > 0 ? '$h:$m:$s' : '$m:$s';
+
+    return Container(
+      color: Colors.black87,
+      child: Center(
+        child: Container(
+          margin: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: NipahColors.surface,
+            border: Border.all(color: NipahColors.lineSoft),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.play_circle_outline, color: NipahColors.gold, size: 48),
+              const SizedBox(height: 16),
+              Text('${L10n.t('resumeFrom')} $timeStr?', style: NipahTheme.heading(size: 20)),
+              const SizedBox(height: 8),
+              Text(
+                'Episode $_currentEpisode',
+                style: NipahTheme.body(size: 13, color: NipahColors.textDim),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    onTap: _startFromBeginning,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: NipahColors.lineSoft),
+                        color: NipahColors.surface2,
+                      ),
+                      child: Text(L10n.t('startOver'), style: NipahTheme.label(size: 11, color: NipahColors.textDim)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: _resumeFromPosition,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [NipahColors.gold, NipahColors.goldStrong],
+                        ),
+                      ),
+                      child: Text(L10n.t('resume'), style: NipahTheme.label(size: 11, color: NipahColors.bg)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverlayControls() {
+    return Stack(
+      children: [
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 8, 16, 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xc8000000), Colors.transparent],
+              ),
+            ),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Icon(Icons.arrow_back, color: NipahColors.text, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.title, style: NipahTheme.heading(size: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text('Episode $_currentEpisode', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: Container(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [Color(0xc8000000), Colors.transparent],
+              ),
+            ),
+              child: Column(
+                children: [
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: NipahColors.gold,
+                      inactiveTrackColor: NipahColors.surface,
+                      thumbColor: NipahColors.gold,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      trackHeight: 3,
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                    ),
+                    child: Slider(
+                      value: _player.state.duration.inMilliseconds > 0
+                          ? _player.state.position.inMilliseconds.toDouble().clamp(0.0, _player.state.duration.inMilliseconds.toDouble())
+                          : 0.0,
+                      max: _player.state.duration.inMilliseconds > 0 ? _player.state.duration.inMilliseconds.toDouble() : 1.0,
+                      onChanged: (value) {
+                        _player.seek(Duration(milliseconds: value.toInt()));
+                        _showControlsBriefly();
+                      },
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(_formatDuration(_player.state.position), style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
+                      Row(
+                        children: [
+                          if (_currentEpisode > 1)
+                            _controlBtn(icon: Icons.skip_previous, onTap: () => _changeEpisode(-1)),
+                          if (_currentEpisode < widget.episodes.length) ...[
+                            const SizedBox(width: 16),
+                            _controlBtn(icon: Icons.skip_next, onTap: () => _changeEpisode(1)),
+                          ],
+                        ],
+                      ),
+                      Text(_formatDuration(_player.state.duration), style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
+                    ],
+                  ),
+                ],
+              ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _controlBtn({required IconData icon, required VoidCallback onTap, double size = 28}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Icon(icon, color: NipahColors.text, size: size),
+    );
+  }
+
+  String _formatDuration(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
+}

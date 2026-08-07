@@ -1,9 +1,14 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:open_file/open_file.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../api.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
@@ -493,6 +498,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String _themeColor = 'Gold';
   String _themeName = 'Dark';
   String _appVersion = '1.2.4';
+  String _appMode = 'anime';
   bool _loaded = false;
 
   @override
@@ -519,6 +525,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _nsfwFilter = s['nsfwFilter'] ?? false;
         _themeColor = s['themeColor'] ?? 'Gold';
         _themeName = s['theme'] ?? 'Dark';
+        _appMode = s['appMode'] ?? 'anime';
         _loaded = true;
       });
       L10n.setLang(_language);
@@ -722,7 +729,71 @@ class _SettingsPageState extends State<SettingsPage> {
         _settingRow(icon: Icons.filter_list, title: L10n.t('nsfwFilter'),
           subtitle: L10n.t('nsfwSubtitle'),
           trailing: _buildToggle(value: _nsfwFilter, onChanged: (v) { setState(() => _nsfwFilter = v); _save('nsfwFilter', v); })),
+        const SizedBox(height: 16),
+        _sectionTitle('Content Mode'),
+        const SizedBox(height: 8),
+        _buildModeSwitch(),
       ],
+    );
+  }
+
+  Widget _buildModeSwitch() {
+    final isAnime = _appMode == 'anime';
+    return Container(
+      decoration: BoxDecoration(
+        color: NipahColors.surface2,
+        border: Border.all(color: NipahColors.lineSoft),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() => _appMode = 'anime');
+                _save('appMode', 'anime');
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: isAnime ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
+                  color: isAnime ? null : Colors.transparent,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.animation, size: 18, color: isAnime ? NipahColors.bg : NipahColors.textDim),
+                    const SizedBox(width: 8),
+                    Text('Anime', style: NipahTheme.label(size: 12, color: isAnime ? NipahColors.bg : NipahColors.textDim)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() => _appMode = 'drama');
+                _save('appMode', 'drama');
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: !isAnime ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
+                  color: !isAnime ? null : Colors.transparent,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.tv, size: 18, color: !isAnime ? NipahColors.bg : NipahColors.textDim),
+                    const SizedBox(width: 8),
+                    Text('Drama', style: NipahTheme.label(size: 12, color: !isAnime ? NipahColors.bg : NipahColors.textDim)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -781,7 +852,76 @@ class _SettingsPageState extends State<SettingsPage> {
             decoration: BoxDecoration(color: NipahColors.success.withValues(alpha: 0.1), border: Border.all(color: NipahColors.success)),
             child: Text('MediaKit', style: NipahTheme.label(size: 9, color: NipahColors.success)),
           )),
+        Divider(color: NipahColors.lineSoft),
+        GestureDetector(
+          onTap: _showPlayUrlDialog,
+          child: _settingRow(icon: Icons.link, title: 'Play URL',
+            subtitle: 'Play a direct video URL (HLS, MP4)',
+            trailing: Icon(Icons.chevron_right, color: NipahColors.textDim, size: 20)),
+        ),
       ],
+    );
+  }
+
+  void _showPlayUrlDialog() {
+    final urlController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: NipahColors.surface,
+        shape: const RoundedRectangleBorder(),
+        title: Text('Play URL', style: NipahTheme.heading(size: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Enter a direct video URL (HLS .m3u8 or MP4)', style: NipahTheme.body(size: 12, color: NipahColors.textDim)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: urlController,
+              style: NipahTheme.body(size: 13),
+              decoration: InputDecoration(
+                hintText: 'https://...',
+                hintStyle: NipahTheme.body(size: 12, color: NipahColors.textDim),
+                filled: true,
+                fillColor: NipahColors.surface2,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: NipahColors.lineSoft),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: NipahColors.lineSoft),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: NipahColors.gold),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(L10n.t('cancel'), style: NipahTheme.body(color: NipahColors.textDim)),
+          ),
+          TextButton(
+            onPressed: () {
+              final url = urlController.text.trim();
+              if (url.isNotEmpty) {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => _UrlPlayerPage(url: url),
+                  ),
+                );
+              }
+            },
+            child: Text('Play', style: NipahTheme.body(color: NipahColors.gold)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1189,6 +1329,155 @@ class _UpdateDialogState extends State<_UpdateDialog> {
               style: NipahTheme.label(size: 11, color: NipahColors.gold)),
           ),
       ],
+    );
+  }
+}
+
+class _UrlPlayerPage extends StatefulWidget {
+  final String url;
+  const _UrlPlayerPage({required this.url});
+
+  @override
+  State<_UrlPlayerPage> createState() => _UrlPlayerPageState();
+}
+
+class _UrlPlayerPageState extends State<_UrlPlayerPage> {
+  late final Player _player;
+  late final VideoController _videoController;
+  bool _isInitializing = true;
+  bool _showControls = true;
+  bool _isPlaying = false;
+  Timer? _hideTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _player = Player();
+    _videoController = VideoController(_player);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    WakelockPlus.enable();
+
+    _player.stream.playing.listen((playing) {
+      if (mounted) {
+        setState(() => _isPlaying = playing);
+        if (playing) _resetHideTimer();
+      }
+    });
+
+    _loadVideo();
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _player.dispose();
+    WakelockPlus.disable();
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  Future<void> _loadVideo() async {
+    try {
+      await _player.open(Media(widget.url));
+      setState(() => _isInitializing = false);
+      _resetHideTimer();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to load: $e'),
+          backgroundColor: NipahColors.danger,
+        ));
+      }
+    }
+  }
+
+  void _resetHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted && _isPlaying) setState(() => _showControls = false);
+    });
+  }
+
+  void _toggleControls() {
+    setState(() => _showControls = !_showControls);
+    if (_showControls) _resetHideTimer();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _toggleControls,
+              child: Video(controller: _videoController, controls: NoVideoControls),
+            ),
+          ),
+          if (_isInitializing)
+            const Positioned.fill(
+              child: Center(child: NipahLoader(size: 28)),
+            ),
+          AnimatedOpacity(
+            opacity: _showControls ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            child: IgnorePointer(
+              ignoring: !_showControls,
+              child: Column(
+                children: [
+                  Container(
+                    padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 8, 16, 16),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xc8000000), Colors.transparent]),
+                    ),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Icon(Icons.arrow_back, color: NipahColors.text, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text('Direct URL', style: NipahTheme.heading(size: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 16),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xc8000000), Colors.transparent]),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        GestureDetector(
+                          onTap: () { _player.seek(_player.state.position - const Duration(seconds: 10)); },
+                          child: Icon(Icons.replay_10, color: NipahColors.text, size: 28),
+                        ),
+                        const SizedBox(width: 32),
+                        GestureDetector(
+                          onTap: () => _player.playOrPause(),
+                          child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: NipahColors.text, size: 42),
+                        ),
+                        const SizedBox(width: 32),
+                        GestureDetector(
+                          onTap: () { _player.seek(_player.state.position + const Duration(seconds: 10)); },
+                          child: Icon(Icons.forward_10, color: NipahColors.text, size: 28),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

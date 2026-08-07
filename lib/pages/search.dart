@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../api.dart';
+import '../drama_api.dart';
 import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/anime_card.dart';
+import 'drama_detail.dart';
 import 'settings.dart';
 
 class SearchPage extends StatefulWidget {
@@ -29,6 +32,8 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
   String _topSort = 'SCORE_DESC';
   bool _hasMoreSearch = true;
   bool _hasMoreTop = true;
+  String _appMode = 'anime';
+  List<Drama> _dramaResults = [];
 
   final _quickSearches = ['Naruto', 'One Piece', 'Attack on Titan', 'Demon Slayer', 'Jujutsu Kaisen', 'Chainsaw Man'];
 
@@ -66,7 +71,9 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
   }
 
   Future<void> _loadInitialData() async {
+    final mode = await getAppMode();
     setState(() {
+      _appMode = mode;
       _isLoadingGenres = true;
       _isLoadingTop = true;
     });
@@ -87,16 +94,28 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
     setState(() {
       _isSearching = true;
       _searchResults = [];
+      _dramaResults = [];
       _searchPage = 1;
       _hasMoreSearch = true;
     });
-    final results = await searchAnime(query, page: _searchPage);
-    if (mounted) {
-      setState(() {
-        _searchResults = results;
-        _isSearching = false;
-        _hasMoreSearch = results.length >= 50;
-      });
+    if (_appMode == 'drama') {
+      final results = await searchDramas(query);
+      if (mounted) {
+        setState(() {
+          _dramaResults = results;
+          _isSearching = false;
+          _hasMoreSearch = false;
+        });
+      }
+    } else {
+      final results = await searchAnime(query, page: _searchPage);
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+          _hasMoreSearch = results.length >= 50;
+        });
+      }
     }
   }
 
@@ -244,6 +263,9 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
     if (_isSearching) {
       return _buildShimmerGrid();
     }
+    if (_appMode == 'drama') {
+      return _buildDramaSearchResults();
+    }
     if (_searchResults.isEmpty && _searchController.text.isNotEmpty) {
       return Center(
         child: Column(
@@ -303,6 +325,124 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
       ),
       itemCount: _searchResults.length,
       itemBuilder: (context, index) => AnimeCard(anime: _searchResults[index]),
+    );
+  }
+
+  Widget _buildDramaSearchResults() {
+    if (_dramaResults.isEmpty && _searchController.text.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 64, color: NipahColors.textDim),
+            const SizedBox(height: 16),
+            Text('No dramas found', style: NipahTheme.body(color: NipahColors.textDim)),
+          ],
+        ),
+      );
+    }
+    if (_dramaResults.isEmpty) {
+      final dramaQuickSearches = ['Crash Landing', 'Squid Game', 'Boys Over Flowers', 'Goblin', 'Descendants of the Sun', 'Vincenzo'];
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text('Quick Search', style: NipahTheme.label(size: 11)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: dramaQuickSearches.map((query) {
+                return GestureDetector(
+                  onTap: () {
+                    _searchController.text = query;
+                    _performSearch(query);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: NipahColors.chipBg,
+                      border: Border.fromBorderSide(
+                        BorderSide(color: NipahColors.lineSoft),
+                      ),
+                    ),
+                    child: Text(query, style: NipahTheme.body(size: 12, color: NipahColors.textSoft)),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      );
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.6,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemCount: _dramaResults.length,
+      itemBuilder: (context, index) {
+        final drama = _dramaResults[index];
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => DramaDetailPage(drama: drama)),
+            );
+          },
+          child: Container(
+            decoration: NipahTheme.cardDecoration,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CachedNetworkImage(
+                        imageUrl: drama.poster.isNotEmpty ? drama.poster : drama.backdrop,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Container(
+                          color: NipahColors.surface,
+                          child: Icon(Icons.tv, color: NipahColors.textDim),
+                        ),
+                      ),
+                      if (drama.episodes > 0)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            color: NipahColors.bg,
+                            child: Text(
+                              'EP ${drama.episodes}',
+                              style: NipahTheme.label(size: 9, color: NipahColors.gold),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Text(
+                    drama.title,
+                    style: NipahTheme.body(size: 11, weight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

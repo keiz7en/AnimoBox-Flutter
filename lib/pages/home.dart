@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api.dart';
+import '../drama_api.dart';
 import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/anime_card.dart';
 import 'anime_detail.dart';
+import 'drama_detail.dart';
 import 'settings.dart';
 
 class HomePage extends StatefulWidget {
@@ -17,15 +19,22 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String _appMode = 'anime';
+
+  // Anime data
   final Map<int, List<Anime>> _tabData = {};
   final Map<int, bool> _tabLoading = {};
   final Map<int, bool> _tabLoaded = {};
-
-  // Hero carousel
   List<Anime> _heroAnime = [];
   int _heroIndex = 0;
   Timer? _heroTimer;
   late final PageController _heroPageController;
+
+  // Drama data
+  List<Drama> _heroDramas = [];
+  final Map<int, List<Drama>> _dramaTabData = {};
+  final Map<int, bool> _dramaTabLoading = {};
+  final Map<int, bool> _dramaTabLoaded = {};
 
   @override
   void initState() {
@@ -35,7 +44,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) _loadTab(_tabController.index);
     });
-    _loadTab(0);
+    _loadMode();
   }
 
   @override
@@ -46,7 +55,23 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
+  Future<void> _loadMode() async {
+    final mode = await getAppMode();
+    if (mounted) {
+      setState(() => _appMode = mode);
+      _loadTab(0);
+    }
+  }
+
   Future<void> _loadTab(int index) async {
+    if (_appMode == 'drama') {
+      await _loadDramaTab(index);
+    } else {
+      await _loadAnimeTab(index);
+    }
+  }
+
+  Future<void> _loadAnimeTab(int index) async {
     if (_tabLoaded[index] == true) return;
     setState(() => _tabLoading[index] = true);
     try {
@@ -85,16 +110,58 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
+  Future<void> _loadDramaTab(int index) async {
+    if (_dramaTabLoaded[index] == true) return;
+    setState(() => _dramaTabLoading[index] = true);
+    try {
+      List<Drama> data;
+      switch (index) {
+        case 0:
+          data = await getPopularDramas();
+          break;
+        case 1:
+          data = await getRecentDramas();
+          break;
+        case 2:
+          data = await getNewDramas();
+          break;
+        default:
+          data = [];
+      }
+      if (mounted) {
+        setState(() {
+          _dramaTabData[index] = data;
+          _dramaTabLoading[index] = false;
+          _dramaTabLoaded[index] = true;
+          if (index == 0 && data.isNotEmpty && _heroDramas.isEmpty) {
+            _heroDramas = data.take(15).toList();
+            _startHeroTimer();
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _dramaTabLoading[index] = false;
+          _dramaTabLoaded[index] = true;
+        });
+      }
+    }
+  }
+
   void _startHeroTimer() {
     _heroTimer?.cancel();
     _heroTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (mounted && _heroAnime.isNotEmpty) {
-        final next = (_heroIndex + 1) % _heroAnime.length;
-        _heroPageController.animateToPage(
-          next,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
+      if (mounted) {
+        final heroList = _appMode == 'drama' ? _heroDramas : _heroAnime;
+        if (heroList.isNotEmpty) {
+          final next = (_heroIndex + 1) % heroList.length;
+          _heroPageController.animateToPage(
+            next,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut,
+          );
+        }
       }
     });
   }
@@ -105,7 +172,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Future<void> _onRefresh() async {
     _tabLoaded.clear();
+    _dramaTabLoaded.clear();
     _heroAnime = [];
+    _heroDramas = [];
     _heroIndex = 0;
     await _loadTab(_tabController.index);
   }
@@ -146,16 +215,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildHeroSection() {
-    if (_heroAnime.isEmpty) return const SizedBox.shrink();
+    final heroList = _appMode == 'drama' ? _heroDramas : _heroAnime;
+    if (heroList.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
       height: 420,
       width: double.infinity,
       child: PageView.builder(
         controller: _heroPageController,
-        itemCount: _heroAnime.length,
+        itemCount: heroList.length,
         onPageChanged: _onHeroPageChanged,
         itemBuilder: (context, index) {
+          if (_appMode == 'drama') {
+            return _buildDramaHeroItem(_heroDramas[index]);
+          }
           return _buildHeroItem(_heroAnime[index]);
         },
       ),
@@ -327,7 +400,183 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
+  Widget _buildDramaHeroItem(Drama drama) {
+    final titleLen = drama.title.length;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DramaDetailPage(drama: drama),
+          ),
+        );
+      },
+      child: SizedBox(
+        height: 420,
+        width: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CachedNetworkImage(
+              imageUrl: drama.backdrop.isNotEmpty ? drama.backdrop : drama.poster,
+              fit: BoxFit.cover,
+              errorWidget: (_, __, ___) => Container(
+                color: NipahColors.surface,
+                child: Icon(Icons.tv, color: NipahColors.textDim, size: 64),
+              ),
+            ),
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerRight,
+                    end: Alignment.centerLeft,
+                    colors: [
+                      Color(0xfc06070a),
+                      Color(0x7008090b),
+                      Color(0x1f08090b),
+                      Color(0xd108090b),
+                      Color(0xfa06070a),
+                    ],
+                    stops: [0.0, 0.24, 0.54, 0.78, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x1f050609),
+                      Color(0x0f050609),
+                      Color(0x2308090b),
+                      Color(0xae08090b),
+                      Color(0xf708090b),
+                    ],
+                    stops: [0.0, 0.12, 0.30, 0.74, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 48,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (drama.poster.isNotEmpty)
+                    Container(
+                      width: 100,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x52000000),
+                            blurRadius: 44,
+                            offset: Offset(0, 24),
+                          ),
+                        ],
+                        image: DecorationImage(
+                          image: CachedNetworkImageProvider(drama.poster),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            if (drama.genres.isNotEmpty)
+                              _HeroChip(text: drama.genres.first),
+                            if (drama.country.isNotEmpty)
+                              _HeroChip(text: drama.country),
+                            if (drama.rating > 0)
+                              _HeroChip(text: '${drama.rating.toStringAsFixed(1)}'),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          drama.title,
+                          style: NipahTheme.heading(
+                            size: titleLen > 28 ? 24 : titleLen > 18 ? 28 : 34,
+                            height: 0.94,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 12),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DramaDetailPage(drama: drama),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: NipahTheme.goldButtonDecoration,
+                            child: Text(
+                              L10n.t('watchNow'),
+                              style: NipahTheme.label(
+                                size: 12,
+                                color: NipahColors.bg,
+                                letterSpacing: 0.04,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        if (drama.description.isNotEmpty)
+                          Text(
+                            drama.description,
+                            style: NipahTheme.body(size: 13, color: const Color(0xd1f3efe8)),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_heroDramas.length > 1)
+              Positioned(
+                left: 16,
+                bottom: 28,
+                child: Row(
+                  children: List.generate(_heroDramas.length, (i) {
+                    return Container(
+                      width: i == _heroIndex ? 24 : 12,
+                      height: 4,
+                      margin: const EdgeInsets.only(right: 8),
+                      color: i == _heroIndex
+                          ? NipahColors.gold
+                          : const Color(0x42ffffff),
+                    );
+                  }),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTabBar() {
+    final isDrama = _appMode == 'drama';
     return Container(
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: NipahColors.lineSoft)),
@@ -349,21 +598,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         dividerColor: Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         tabs: [
-          Tab(text: L10n.t('schedule')),
-          Tab(text: L10n.t('top')),
-          Tab(text: L10n.t('latest')),
+          Tab(text: isDrama ? 'Popular' : L10n.t('schedule')),
+          Tab(text: isDrama ? 'Recent' : L10n.t('top')),
+          Tab(text: isDrama ? 'New' : L10n.t('latest')),
         ],
       ),
     );
   }
 
   Widget _buildSectionHeader() {
-    final labels = [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
-    final sublabels = [
-      L10n.t('schedule'),
-      L10n.t('top'),
-      L10n.t('latest'),
-    ];
+    final isDrama = _appMode == 'drama';
+    final labels = isDrama ? ['Popular', 'Recent', 'New'] : [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
     final idx = _tabController.index;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -372,13 +617,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         children: [
           Text(labels[idx], style: NipahTheme.label(size: 11)),
           const SizedBox(height: 2),
-          Text(sublabels[idx], style: NipahTheme.body(size: 12, color: NipahColors.textDim)),
+          Text(labels[idx], style: NipahTheme.body(size: 12, color: NipahColors.textDim)),
         ],
       ),
     );
   }
 
   Widget _buildTabContent(int index) {
+    if (_appMode == 'drama') {
+      return _buildDramaTabContent(index);
+    }
+    return _buildAnimeTabContent(index);
+  }
+
+  Widget _buildAnimeTabContent(int index) {
     final isLoading = _tabLoading[index] ?? true;
     final data = _tabData[index] ?? [];
 
@@ -424,6 +676,48 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
+  Widget _buildDramaTabContent(int index) {
+    final isLoading = _dramaTabLoading[index] ?? true;
+    final data = _dramaTabData[index] ?? [];
+
+    if (isLoading) return _buildShimmerGrid();
+
+    if (data.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.tv, size: 56, color: NipahColors.textDim),
+            const SizedBox(height: 12),
+            Text('No dramas found', style: NipahTheme.body(size: 15, color: NipahColors.textDim)),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () {
+                setState(() => _dramaTabLoaded[index] = false);
+                _loadTab(index);
+              },
+              child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 12)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.6,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemCount: data.length,
+      itemBuilder: (context, index2) {
+        return _DramaCard(drama: data[index2]);
+      },
+    );
+  }
+
   Widget _buildShimmerGrid() {
     return GridView.builder(
       padding: const EdgeInsets.all(12),
@@ -436,6 +730,85 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
       itemCount: 12,
       itemBuilder: (context, index) => _NipahShimmer(delay: index * 80),
+    );
+  }
+}
+
+class _DramaCard extends StatelessWidget {
+  final Drama drama;
+  const _DramaCard({required this.drama});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DramaDetailPage(drama: drama),
+          ),
+        );
+      },
+      child: Container(
+        decoration: NipahTheme.cardDecoration,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: drama.poster.isNotEmpty ? drama.poster : drama.backdrop,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => Container(
+                      color: NipahColors.surface,
+                      child: Icon(Icons.tv, color: NipahColors.textDim),
+                    ),
+                  ),
+                  if (drama.episodes > 0)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        color: NipahColors.bg,
+                        child: Text(
+                          'EP ${drama.episodes}',
+                          style: NipahTheme.label(size: 9, color: NipahColors.gold),
+                        ),
+                      ),
+                    ),
+                  if (drama.status.isNotEmpty)
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        color: NipahColors.bg,
+                        child: Text(
+                          drama.status,
+                          style: NipahTheme.label(size: 8, color: NipahColors.textDim),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(6),
+              child: Text(
+                drama.title,
+                style: NipahTheme.body(size: 11, weight: FontWeight.w600),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

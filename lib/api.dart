@@ -764,6 +764,7 @@ const Map<String, dynamic> defaultSettings = {
   'nsfwFilter': false,
   'themeColor': 'Gold',
   'theme': 'Dark',
+  'appMode': 'anime',
 };
 
 Future<Map<String, dynamic>> getSettings() async {
@@ -788,6 +789,11 @@ Future<void> saveSetting(String key, dynamic value) async {
     settings[key] = value;
     await prefs.setString('settings', jsonEncode(settings));
   } catch (_) {}
+}
+
+Future<String> getAppMode() async {
+  final settings = await getSettings();
+  return settings['appMode'] ?? 'anime';
 }
 
 // ── Update checker ──────────────────────────────────────────────────

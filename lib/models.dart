@@ -146,3 +146,176 @@ class SearchResult {
 
   SearchResult({required this.id, required this.title, required this.source});
 }
+
+class Drama {
+  final int id;
+  final String title;
+  final String slug;
+  final String poster;
+  final String backdrop;
+  final int episodes;
+  final String country;
+  final String status;
+  final double rating;
+  final List<String> genres;
+  final String description;
+  final String duration;
+  final String year;
+
+  Drama({
+    required this.id,
+    required this.title,
+    this.slug = '',
+    this.poster = '',
+    this.backdrop = '',
+    this.episodes = 0,
+    this.country = '',
+    this.status = '',
+    this.rating = 0,
+    this.genres = const [],
+    this.description = '',
+    this.duration = '',
+    this.year = '',
+  });
+
+  factory Drama.fromKissAsian(Map<String, dynamic> json) {
+    return Drama(
+      id: json['id'] ?? 0,
+      title: json['title'] ?? '',
+      slug: json['slug'] ?? '',
+      poster: json['poster'] ?? '',
+      backdrop: json['backdrop'] ?? '',
+      episodes: json['episodes'] ?? json['serverEpisodesCount'] ?? 0,
+      country: json['country'] ?? '',
+      status: json['status'] ?? '',
+      rating: (json['rating'] ?? 0).toDouble(),
+      genres: List<String>.from(json['genres'] ?? []),
+      description: json['description'] ?? '',
+      duration: json['duration'] ?? '',
+      year: json['year'] ?? '',
+    );
+  }
+
+  String get displayTitle => title;
+  String get imageUrl => poster.isNotEmpty ? poster : backdrop;
+}
+
+class DramaDetail extends Drama {
+  final int serverEpisodesCount;
+
+  DramaDetail({
+    required super.id,
+    required super.title,
+    super.slug,
+    super.poster,
+    super.backdrop,
+    super.episodes,
+    super.country,
+    super.status,
+    super.rating,
+    super.genres,
+    super.description,
+    super.duration,
+    super.year,
+    this.serverEpisodesCount = 0,
+  });
+
+  factory DramaDetail.fromKissAsian(Map<String, dynamic> json) {
+    return DramaDetail(
+      id: json['id'] ?? 0,
+      title: json['title'] ?? '',
+      slug: json['slug'] ?? '',
+      poster: json['poster'] ?? '',
+      backdrop: json['backdrop'] ?? '',
+      episodes: json['episodes'] ?? 0,
+      country: json['country'] ?? '',
+      status: json['status'] ?? '',
+      rating: (json['rating'] ?? 0).toDouble(),
+      genres: List<String>.from(json['genres'] ?? []),
+      description: json['description'] ?? '',
+      duration: json['duration'] ?? '',
+      year: json['year'] ?? '',
+      serverEpisodesCount: json['serverEpisodesCount'] ?? 0,
+    );
+  }
+}
+
+class DramaEpisodeData {
+  final List<DramaEpisode> episodes;
+  final List<DramaServer> servers;
+
+  DramaEpisodeData({required this.episodes, required this.servers});
+
+  factory DramaEpisodeData.fromJson(Map<String, dynamic> json) {
+    final eps = (json['episodes'] as List? ?? []).map((e) => DramaEpisode.fromJson(e)).toList();
+    final srvs = (json['servers'] as List? ?? []).map((s) => DramaServer.fromJson(s)).toList();
+    return DramaEpisodeData(episodes: eps, servers: srvs);
+  }
+}
+
+class DramaEpisode {
+  final int id;
+  final int number;
+  final String title;
+  final String duration;
+  final String thumbnail;
+  final String airDate;
+  final String videoUrl;
+
+  DramaEpisode({
+    required this.id,
+    required this.number,
+    this.title = '',
+    this.duration = '',
+    this.thumbnail = '',
+    this.airDate = '',
+    this.videoUrl = '',
+  });
+
+  factory DramaEpisode.fromJson(Map<String, dynamic> json) {
+    return DramaEpisode(
+      id: json['id'] ?? 0,
+      number: json['number'] ?? 0,
+      title: json['title'] ?? '',
+      duration: json['duration'] ?? '',
+      thumbnail: json['thumbnail'] ?? '',
+      airDate: json['airDate'] ?? '',
+      videoUrl: json['videoUrl'] ?? '',
+    );
+  }
+}
+
+class DramaServer {
+  final String name;
+  final List<DramaServerEpisode> episodes;
+
+  DramaServer({required this.name, required this.episodes});
+
+  factory DramaServer.fromJson(Map<String, dynamic> json) {
+    final eps = (json['episodes'] as List? ?? []).map((e) => DramaServerEpisode.fromJson(e)).toList();
+    return DramaServer(name: json['name'] ?? 'Server', episodes: eps);
+  }
+}
+
+class DramaServerEpisode {
+  final int id;
+  final String url;
+  final bool locked;
+  final int number;
+
+  DramaServerEpisode({
+    required this.id,
+    this.url = '',
+    this.locked = false,
+    required this.number,
+  });
+
+  factory DramaServerEpisode.fromJson(Map<String, dynamic> json) {
+    return DramaServerEpisode(
+      id: json['id'] ?? 0,
+      url: json['url'] ?? '',
+      locked: json['locked'] ?? false,
+      number: json['number'] ?? 0,
+    );
+  }
+}
