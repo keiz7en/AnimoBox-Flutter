@@ -155,53 +155,112 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
 
   Widget _buildEpisodeList() {
     final episodes = _episodeData!.episodes;
+    final useGrid = episodes.length > 30;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Episodes (${episodes.length})', style: NipahTheme.heading(size: 16)),
         const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
+        if (useGrid)
+          _buildGrid(episodes)
+        else
+          _buildList(episodes),
+      ],
+    );
+  }
+
+  Widget _buildGrid(List<DramaEpisode> episodes) {
+    final width = MediaQuery.of(context).size.width;
+    final crossCount = width > 600 ? 8 : (width > 400 ? 6 : 5);
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossCount,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+      ),
+      itemCount: episodes.length,
+      itemBuilder: (context, index) {
+        final ep = episodes[index];
+        return GestureDetector(
+          onTap: () => _playEpisode(ep.number),
+          child: Container(
+            decoration: BoxDecoration(
+              color: NipahColors.surface2,
+              border: Border.all(color: NipahColors.lineSoft),
+            ),
+            child: Center(
+              child: Text(
+                '${ep.number}',
+                style: NipahTheme.heading(size: 16, color: NipahColors.gold),
+              ),
+            ),
           ),
-          itemCount: episodes.length,
-          itemBuilder: (context, index) {
-            final ep = episodes[index];
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DramaWatchPage(
-                      title: widget.drama.title,
-                      episode: ep.number,
-                      mediaId: widget.drama.id,
-                      episodes: episodes,
-                      coverImage: widget.drama.poster,
+        );
+      },
+    );
+  }
+
+  Widget _buildList(List<DramaEpisode> episodes) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: episodes.length,
+      separatorBuilder: (_, __) => Container(height: 1, color: NipahColors.lineSoft),
+      itemBuilder: (context, index) {
+        final ep = episodes[index];
+        return GestureDetector(
+          onTap: () => _playEpisode(ep.number),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            color: NipahColors.surface,
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [NipahColors.gold, NipahColors.goldStrong],
                     ),
                   ),
-                );
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: NipahColors.surface2,
-                  border: Border.all(color: NipahColors.lineSoft),
-                ),
-                child: Center(
-                  child: Text(
-                    '${ep.number}',
-                    style: NipahTheme.heading(size: 16, color: NipahColors.gold),
+                  child: Center(
+                    child: Text(
+                      '${ep.number}',
+                      style: NipahTheme.label(size: 11, color: NipahColors.bg),
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Episode ${ep.number}',
+                    style: NipahTheme.body(size: 14, color: NipahColors.text),
+                  ),
+                ),
+                Icon(Icons.play_circle_outline, color: NipahColors.gold, size: 22),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _playEpisode(int number) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DramaWatchPage(
+          title: widget.drama.title,
+          episode: number,
+          mediaId: widget.drama.id,
+          episodes: _episodeData!.episodes,
+          coverImage: widget.drama.poster,
         ),
-      ],
+      ),
     );
   }
 }

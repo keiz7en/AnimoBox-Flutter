@@ -452,7 +452,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
 
     _vlcController = VlcPlayerController.network(
       url,
-      hwAcc: HwAcc.full,
+      hwAcc: HwAcc.auto,
       autoPlay: true,
       options: VlcPlayerOptions(
         http: VlcHttpOptions(httpOptsList),
