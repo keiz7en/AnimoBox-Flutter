@@ -710,6 +710,8 @@ class _SettingsPageState extends State<SettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildContentModeCard(),
+        const SizedBox(height: 16),
         _buildUpdateCard(),
         const SizedBox(height: 16),
         _sectionTitle(L10n.t('appearance')),
@@ -729,68 +731,86 @@ class _SettingsPageState extends State<SettingsPage> {
         _settingRow(icon: Icons.filter_list, title: L10n.t('nsfwFilter'),
           subtitle: L10n.t('nsfwSubtitle'),
           trailing: _buildToggle(value: _nsfwFilter, onChanged: (v) { setState(() => _nsfwFilter = v); _save('nsfwFilter', v); })),
-        const SizedBox(height: 16),
-        _sectionTitle('Content Mode'),
-        const SizedBox(height: 8),
-        _buildModeSwitch(),
       ],
     );
   }
 
-  Widget _buildModeSwitch() {
+  Widget _buildContentModeCard() {
     final isAnime = _appMode == 'anime';
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: NipahColors.surface2,
+        color: NipahColors.surface,
         border: Border.all(color: NipahColors.lineSoft),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _appMode = 'anime');
-                _save('appMode', 'anime');
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: isAnime ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
-                  color: isAnime ? null : Colors.transparent,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.animation, size: 18, color: isAnime ? NipahColors.bg : NipahColors.textDim),
-                    const SizedBox(width: 8),
-                    Text('Anime', style: NipahTheme.label(size: 12, color: isAnime ? NipahColors.bg : NipahColors.textDim)),
-                  ],
-                ),
-              ),
-            ),
+          Row(
+            children: [
+              Icon(Icons.swap_horiz, color: NipahColors.gold, size: 20),
+              const SizedBox(width: 8),
+              Text('Content Mode', style: NipahTheme.heading(size: 16)),
+            ],
           ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _appMode = 'drama');
-                _save('appMode', 'drama');
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: !isAnime ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
-                  color: !isAnime ? null : Colors.transparent,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.tv, size: 18, color: !isAnime ? NipahColors.bg : NipahColors.textDim),
-                    const SizedBox(width: 8),
-                    Text('Drama', style: NipahTheme.label(size: 12, color: !isAnime ? NipahColors.bg : NipahColors.textDim)),
-                  ],
+          const SizedBox(height: 4),
+          Text(
+            'Switch between Anime and Drama content',
+            style: NipahTheme.body(size: 12, color: NipahColors.textDim),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _appMode = 'anime');
+                    _save('appMode', 'anime');
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      gradient: isAnime ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
+                      color: isAnime ? null : NipahColors.surface2,
+                      border: Border.all(color: isAnime ? NipahColors.gold : NipahColors.lineSoft),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.animation, size: 28, color: isAnime ? NipahColors.bg : NipahColors.textDim),
+                        const SizedBox(height: 6),
+                        Text('Anime', style: NipahTheme.label(size: 13, color: isAnime ? NipahColors.bg : NipahColors.textDim)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _appMode = 'drama');
+                    _save('appMode', 'drama');
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      gradient: !isAnime ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
+                      color: !isAnime ? null : NipahColors.surface2,
+                      border: Border.all(color: !isAnime ? NipahColors.gold : NipahColors.lineSoft),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.tv, size: 28, color: !isAnime ? NipahColors.bg : NipahColors.textDim),
+                        const SizedBox(height: 6),
+                        Text('Drama', style: NipahTheme.label(size: 13, color: !isAnime ? NipahColors.bg : NipahColors.textDim)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

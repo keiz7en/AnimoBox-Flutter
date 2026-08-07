@@ -26,9 +26,16 @@ Future<List<Drama>> searchDramas(String query) async {
 
 Future<List<Drama>> getRecentDramas() async {
   try {
-    final res = await http.get(Uri.parse('$_kissBase/explore?order=1'), headers: _headers()).timeout(const Duration(seconds: 8));
-    if (res.statusCode != 200) return [];
-    return _parseExplorePage(res.body);
+    final queries = ['2026 korean drama', '2026 chinese drama', '2026 thai drama'];
+    final results = <Drama>[];
+    for (final q in queries) {
+      final dramas = await searchDramas(q);
+      for (final d in dramas) {
+        if (!results.any((r) => r.id == d.id)) results.add(d);
+      }
+      if (results.length >= 20) break;
+    }
+    return results.take(20).toList();
   } catch (_) {
     return [];
   }
@@ -36,9 +43,16 @@ Future<List<Drama>> getRecentDramas() async {
 
 Future<List<Drama>> getPopularDramas() async {
   try {
-    final res = await http.get(Uri.parse('$_kissBase/explore?order=0'), headers: _headers()).timeout(const Duration(seconds: 8));
-    if (res.statusCode != 200) return [];
-    return _parseExplorePage(res.body);
+    final queries = ['korean drama', 'crash landing', 'squid game', 'boys over flowers'];
+    final results = <Drama>[];
+    for (final q in queries) {
+      final dramas = await searchDramas(q);
+      for (final d in dramas) {
+        if (!results.any((r) => r.id == d.id)) results.add(d);
+      }
+      if (results.length >= 20) break;
+    }
+    return results.take(20).toList();
   } catch (_) {
     return [];
   }
@@ -46,81 +60,19 @@ Future<List<Drama>> getPopularDramas() async {
 
 Future<List<Drama>> getNewDramas() async {
   try {
-    final res = await http.get(Uri.parse('$_kissBase/explore?order=2'), headers: _headers()).timeout(const Duration(seconds: 8));
-    if (res.statusCode != 200) return [];
-    return _parseExplorePage(res.body);
-  } catch (_) {
-    return [];
-  }
-}
-
-Future<List<Drama>> getExploreDramas({
-  int type = 0,
-  int country = 0,
-  int status = 0,
-  int order = 0,
-  int page = 1,
-}) async {
-  try {
-    final params = <String, String>{};
-    if (type > 0) params['type'] = '$type';
-    if (country > 0) params['country'] = '$country';
-    if (status > 0) params['status'] = '$status';
-    if (order > 0) params['order'] = '$order';
-    if (page > 1) params['page'] = '$page';
-    final qs = params.entries.map((e) => '${e.key}=${e.value}').join('&');
-    final url = '$_kissBase/explore${qs.isNotEmpty ? '?$qs' : ''}';
-    final res = await http.get(Uri.parse(url), headers: _headers()).timeout(const Duration(seconds: 8));
-    if (res.statusCode != 200) return [];
-    return _parseExplorePage(res.body);
-  } catch (_) {
-    return [];
-  }
-}
-
-List<Drama> _parseExplorePage(String html) {
-  final dramas = <Drama>[];
-  final cardPattern = RegExp(r'<article[^>]*class="mcard"[^>]*>(.*?)</article>', dotAll: true);
-  final matches = cardPattern.allMatches(html);
-
-  for (final match in matches) {
-    try {
-      final card = match.group(1)!;
-
-      final titleMatch = RegExp(r'title="([^"]+)"').firstMatch(card);
-      final title = titleMatch?.group(1) ?? '';
-
-      final imgMatch = RegExp(r'<img[^>]*class="img-landscape"[^>]*src="([^"]+)"').firstMatch(card);
-      final posterMatch = RegExp(r'<img[^>]*class="img-portrait"[^>]*src="([^"]+)"').firstMatch(card);
-      final backdrop = imgMatch?.group(1) ?? '';
-      final poster = posterMatch?.group(1) ?? '';
-
-      final epMatch = RegExp(r'EP\s+(\d+)').firstMatch(card);
-      final episodeCount = int.tryParse(epMatch?.group(1) ?? '0') ?? 0;
-
-      final slugMatch = RegExp(r'href="[^"]*/([^"]+)"').firstMatch(card);
-      final slug = slugMatch?.group(1) ?? '';
-
-      if (title.isNotEmpty) {
-        dramas.add(Drama(
-          id: slug.hashCode,
-          title: title,
-          slug: slug,
-          poster: poster,
-          backdrop: backdrop,
-          episodes: episodeCount,
-          country: '',
-          status: '',
-          rating: 0,
-          genres: [],
-          description: '',
-          duration: '',
-          year: '',
-        ));
+    final queries = ['2025 drama', '2026 drama ongoing'];
+    final results = <Drama>[];
+    for (final q in queries) {
+      final dramas = await searchDramas(q);
+      for (final d in dramas) {
+        if (!results.any((r) => r.id == d.id)) results.add(d);
       }
-    } catch (_) {}
+      if (results.length >= 20) break;
+    }
+    return results.take(20).toList();
+  } catch (_) {
+    return [];
   }
-  return dramas;
 }
 
 Future<DramaDetail?> getDramaDetail(String slug) async {
