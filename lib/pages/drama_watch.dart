@@ -94,11 +94,15 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     });
 
     _player.stream.error.listen((error) {
-      if (mounted && error.isNotEmpty) {
-        setState(() {
-          _isInitializing = false;
-          _hasError = true;
-          _errorMessage = 'Player error: $error';
+      if (mounted && error.isNotEmpty && !_isRetrying) {
+        _isRetrying = true;
+        debugPrint('DramaWatch: Player error: $error - trying next source');
+        _trySourceIndex++;
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _isRetrying = false;
+            _tryNextSource();
+          }
         });
       }
     });
@@ -232,6 +236,17 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _showControlsBriefly();
   }
 
+  int _findEpisodeLink(StreamSource source) {
+    for (int i = 0; i < source.links.length; i++) {
+      if (source.links[i].quality.contains('$_currentEpisode')) return i;
+    }
+    return 0;
+  }
+
+  int _trySourceIndex = 0;
+  int _tryLinkIndex = 0;
+  bool _isRetrying = false;
+
   Future<void> _loadStream() async {
     setState(() {
       _isInitializing = true;
@@ -254,9 +269,9 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         return;
       }
 
-      _selectedSourceIndex = 0;
-      _selectedLinkIndex = _findEpisodeLink(sources.first);
-      await _initializePlayer(sources.first.links[_selectedLinkIndex].url);
+      _trySourceIndex = 0;
+      _tryLinkIndex = _findEpisodeLink(sources.first);
+      _tryNextSource();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -268,11 +283,44 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     }
   }
 
-  int _findEpisodeLink(StreamSource source) {
-    for (int i = 0; i < source.links.length; i++) {
-      if (source.links[i].quality.contains('$_currentEpisode')) return i;
+  void _tryNextSource() {
+    if (_trySourceIndex >= _sources.length) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _hasError = true;
+          _errorMessage = 'All servers failed. Try again later.';
+        });
+      }
+      return;
     }
-    return 0;
+    final source = _sources[_trySourceIndex];
+    _tryLinkIndex = _findEpisodeLink(source);
+    if (_tryLinkIndex >= source.links.length) {
+      _trySourceIndex++;
+      _tryNextSource();
+      return;
+    }
+    _selectedSourceIndex = _trySourceIndex;
+    _selectedLinkIndex = _tryLinkIndex;
+    _initializePlayerWithRetry(source.links[_tryLinkIndex].url);
+  }
+
+  Future<void> _initializePlayerWithRetry(String url) async {
+    try {
+      await _player.stop();
+      final headers = <String, String>{
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      };
+      if (url.contains('.m3u8')) {
+        headers['Referer'] = 'https://kissasian.dev/';
+      }
+      await _player.open(Media(url, httpHeaders: headers));
+    } catch (e) {
+      debugPrint('DramaWatch: Failed to open $url - $e');
+      _trySourceIndex++;
+      _tryNextSource();
+    }
   }
 
   Future<void> _initializePlayer(String url) async {
