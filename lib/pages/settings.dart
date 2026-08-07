@@ -840,7 +840,7 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 8),
         _settingRow(icon: Icons.language, title: L10n.t('language'),
           child: _buildDropdown(value: _language, items: ['English', 'Español', 'Português', '日本語', '中文', 'ไทย'],
-            onChanged: (v) { setState(() => _language = v ?? 'English'); _save('language', v); })),
+            onChanged: (v) { final val = v ?? 'English'; setState(() => _language = val); _save('language', val); })),
         Divider(color: NipahColors.lineSoft),
         _settingRow(icon: Icons.palette, title: L10n.t('theme')),
         _buildThemeGrid(),
@@ -986,7 +986,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _settingRow(icon: Icons.high_quality, title: L10n.t('videoQuality'),
           subtitle: L10n.t('videoQualitySub'),
           child: _buildDropdown(value: _videoQuality, items: ['Auto', '1080p', '720p', '480p', '360p'],
-            onChanged: (v) { setState(() => _videoQuality = v ?? 'Auto'); _save('videoQuality', v); })),
+            onChanged: (v) { final val = v ?? 'Auto'; setState(() => _videoQuality = val); _save('videoQuality', val); })),
         Divider(color: NipahColors.lineSoft),
         _settingRow(icon: Icons.info_outline, title: L10n.t('playerEngine'),
           trailing: Container(

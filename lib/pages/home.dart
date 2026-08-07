@@ -79,6 +79,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Future<void> _loadAnimeTab(int index) async {
     if (_tabLoaded[index] == true) return;
+    if (!mounted) return;
     setState(() => _tabLoading[index] = true);
     try {
       List<Anime> data;
@@ -118,6 +119,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Future<void> _loadDramaTab(int index) async {
     if (_dramaTabLoaded[index] == true) return;
+    if (!mounted) return;
     setState(() => _dramaTabLoading[index] = true);
     try {
       List<Drama> data;
@@ -204,11 +206,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Future<void> _onRefresh() async {
+    _heroTimer?.cancel();
     _tabLoaded.clear();
     _dramaTabLoaded.clear();
     _heroAnime = [];
     _heroDramas = [];
     _heroIndex = 0;
+    if (_heroPageController.hasClients) _heroPageController.jumpToPage(0);
     await _loadTab(_tabController.index);
   }
 

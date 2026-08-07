@@ -572,20 +572,23 @@ Future<List<StreamSource>> getStreamURL(String animeTitle, int anilistId, int ep
   final ahFuture = fetchAnimeHeaven();
   final akFuture = fetchAnikoto();
 
-  List<StreamSource> allSources;
+  List<StreamSource> allSources = [];
 
   try {
     allSources = await Future.any([ahFuture, akFuture]);
-  } catch (_) {
-    allSources = <StreamSource>[];
-  }
+  } catch (_) {}
 
   if (allSources.isEmpty) {
     try {
-      allSources = await Future.any([ahFuture, akFuture]);
-    } catch (_) {
-      allSources = <StreamSource>[];
-    }
+      final ahResult = await ahFuture;
+      if (ahResult.isNotEmpty) allSources = ahResult;
+    } catch (_) {}
+  }
+  if (allSources.isEmpty) {
+    try {
+      final akResult = await akFuture;
+      if (akResult.isNotEmpty) allSources = akResult;
+    } catch (_) {}
   }
 
   if (allSources.isEmpty) {

@@ -59,6 +59,7 @@ class _WatchPageState extends State<WatchPage> {
   Duration _lastSavedPosition = Duration.zero;
 
   int _mkErrorCount = 0;
+  final List<StreamSubscription> _subscriptions = [];
 
   @override
   void initState() {
@@ -70,7 +71,7 @@ class _WatchPageState extends State<WatchPage> {
     WakelockPlus.enable();
     _applyAutoRotate();
 
-    _player.stream.playing.listen((playing) {
+    _subscriptions.add(_player.stream.playing.listen((playing) {
       if (mounted && !_useVlc) {
         setState(() => _isPlaying = playing);
         if (playing) {
@@ -83,9 +84,9 @@ class _WatchPageState extends State<WatchPage> {
           _saveCurrentPosition();
         }
       }
-    });
+    }));
 
-    _player.stream.position.listen((position) {
+    _subscriptions.add(_player.stream.position.listen((position) {
       if (mounted && !_useVlc) {
         setState(() => _position = position);
         if (_isPlaying && position.inSeconds > 2) {
@@ -98,19 +99,19 @@ class _WatchPageState extends State<WatchPage> {
           }
         }
       }
-    });
+    }));
 
-    _player.stream.duration.listen((duration) {
+    _subscriptions.add(_player.stream.duration.listen((duration) {
       if (mounted && !_useVlc) setState(() => _duration = duration);
-    });
+    }));
 
-    _player.stream.completed.listen((completed) {
+    _subscriptions.add(_player.stream.completed.listen((completed) {
       if (completed && mounted) {
         clearPlaybackPosition(_positionKey);
       }
-    });
+    }));
 
-    _player.stream.error.listen((error) {
+    _subscriptions.add(_player.stream.error.listen((error) {
       if (mounted && error.isNotEmpty && !_useVlc) {
         _mkErrorCount++;
         debugPrint('Watch: MK stream error (count=$_mkErrorCount): $error');
@@ -125,7 +126,7 @@ class _WatchPageState extends State<WatchPage> {
           }
         }
       }
-    });
+    }));
 
     _init();
   }
@@ -152,6 +153,9 @@ class _WatchPageState extends State<WatchPage> {
 
   @override
   void dispose() {
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
     _vlcFallbackTimer?.cancel();
@@ -313,10 +317,13 @@ class _WatchPageState extends State<WatchPage> {
       }
 
       if (sources.isEmpty || (sources.length == 1 && sources.first.server == 'Unavailable')) {
+        final msg = sources.isNotEmpty && sources.first.links.isNotEmpty
+            ? sources.first.links.first.quality
+            : 'No streaming sources found.';
         setState(() {
           _isInitializing = false;
           _hasError = true;
-          _errorMessage = sources.isNotEmpty ? sources.first.links.first.quality : 'No streaming sources found.';
+          _errorMessage = msg;
         });
         return;
       }
@@ -496,7 +503,7 @@ class _WatchPageState extends State<WatchPage> {
       'episode': _currentEpisode,
       'anilistId': widget.anilistId,
       'coverImage': widget.anime?.coverImage ?? '',
-      'server': _sources.isNotEmpty ? _sources[_selectedSourceIndex].server : '',
+      'server': _sources.isNotEmpty && _selectedSourceIndex < _sources.length ? _sources[_selectedSourceIndex].server : '',
       'watchedAt': DateTime.now().millisecondsSinceEpoch,
     });
   }
@@ -683,6 +690,7 @@ class _WatchPageState extends State<WatchPage> {
     final newEp = _currentEpisode + delta;
     if (newEp < 1) return;
     _saveCurrentPosition();
+    _positionSaveTimer?.cancel();
     setState(() => _currentEpisode = newEp);
     _loadStream();
   }
@@ -938,7 +946,7 @@ class _WatchPageState extends State<WatchPage> {
                 ],
               ),
             ),
-            if (_sources.isNotEmpty && _sources.first.server != 'Unavailable')
+            if (_sources.isNotEmpty && _selectedSourceIndex < _sources.length && _sources.first.server != 'Unavailable')
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(

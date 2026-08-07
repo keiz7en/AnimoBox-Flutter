@@ -24,13 +24,24 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
     _loadDetail();
   }
 
+  String? _loadError;
+
   Future<void> _loadDetail() async {
-    final epData = await getDramaEpisodes(widget.drama.id);
-    if (mounted) {
-      setState(() {
-        _episodeData = epData;
-        _isLoading = false;
-      });
+    try {
+      final epData = await getDramaEpisodes(widget.drama.id);
+      if (mounted) {
+        setState(() {
+          _episodeData = epData;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadError = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -85,10 +96,12 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                           width: 80,
                           height: 120,
                           decoration: BoxDecoration(
-                            image: DecorationImage(
-                              image: CachedNetworkImageProvider(drama.poster),
-                              fit: BoxFit.cover,
-                            ),
+                            color: NipahColors.surface2,
+                          ),
+                          child: CachedNetworkImage(
+                            imageUrl: drama.poster,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Icon(Icons.broken_image, color: NipahColors.textDim, size: 32),
                           ),
                         ),
                       const SizedBox(width: 16),
@@ -138,6 +151,21 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                   const SizedBox(height: 24),
                   if (_isLoading)
                     const Center(child: NipahLoader(size: 28))
+                  else if (_loadError != null)
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Failed to load episodes', style: NipahTheme.body(size: 14, color: NipahColors.danger)),
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: () { setState(() { _isLoading = true; _loadError = null; _loadDetail(); });
+                            },
+                            child: Text('Retry', style: NipahTheme.body(size: 13, color: NipahColors.gold)),
+                          ),
+                        ],
+                      ),
+                    )
                   else if (_episodeData != null && _episodeData!.episodes.isNotEmpty)
                     _buildEpisodeList()
                   else
@@ -250,6 +278,7 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
   }
 
   void _playEpisode(int number) {
+    if (_episodeData == null || _episodeData!.episodes.isEmpty) return;
     Navigator.push(
       context,
       MaterialPageRoute(

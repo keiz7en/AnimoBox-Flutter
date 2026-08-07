@@ -63,6 +63,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
   int _mkErrorCount = 0;
+  final List<StreamSubscription> _subscriptions = [];
 
   @override
   void initState() {
@@ -74,7 +75,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     WakelockPlus.enable();
     _applyAutoRotate();
 
-    _player.stream.playing.listen((playing) {
+    _subscriptions.add(_player.stream.playing.listen((playing) {
       if (mounted && !_useVlc) {
         setState(() => _isPlaying = playing);
         if (playing) {
@@ -82,9 +83,9 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           _vlcFallbackTimer?.cancel();
         }
       }
-    });
+    }));
 
-    _player.stream.position.listen((position) {
+    _subscriptions.add(_player.stream.position.listen((position) {
       if (mounted && !_useVlc) {
         setState(() => _position = position);
         if (_isPlaying && position.inSeconds > 2) {
@@ -97,19 +98,19 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           }
         }
       }
-    });
+    }));
 
-    _player.stream.duration.listen((duration) {
+    _subscriptions.add(_player.stream.duration.listen((duration) {
       if (mounted && !_useVlc) setState(() => _duration = duration);
-    });
+    }));
 
-    _player.stream.completed.listen((completed) {
+    _subscriptions.add(_player.stream.completed.listen((completed) {
       if (completed && mounted) {
         clearPlaybackPosition(_positionKey);
       }
-    });
+    }));
 
-    _player.stream.error.listen((error) {
+    _subscriptions.add(_player.stream.error.listen((error) {
       if (mounted && error.isNotEmpty && !_useVlc) {
         _mkErrorCount++;
         debugPrint('DramaWatch: MK stream error (count=$_mkErrorCount): $error');
@@ -123,7 +124,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           if (url.isNotEmpty) _initVlcPlayer(url);
         }
       }
-    });
+    }));
 
     _init();
   }
@@ -148,6 +149,9 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
 
   @override
   void dispose() {
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
     _vlcFallbackTimer?.cancel();
@@ -297,6 +301,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   }
 
   int _findEpisodeLink(StreamSource source) {
+    if (source.links.isEmpty) return -1;
     for (int i = 0; i < source.links.length; i++) {
       if (source.links[i].quality.contains('$_currentEpisode')) return i;
     }
@@ -360,7 +365,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     }
     final source = _sources[_trySourceIndex];
     _tryLinkIndex = _findEpisodeLink(source);
-    if (_tryLinkIndex >= source.links.length) {
+    if (_tryLinkIndex < 0 || _tryLinkIndex >= source.links.length) {
       _trySourceIndex++;
       _tryNextSource();
       return;
@@ -417,61 +422,32 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     });
   }
 
-  Future<void> _initializePlayer(String url) async {
-    if (_useVlc) {
-      _initVlcPlayer(url);
-      return;
-    }
-    try {
-      await _player.stop();
-      final headers = <String, String>{'User-Agent': _dramaUA};
-      if (url.contains('.m3u8')) {
-        headers['Referer'] = 'https://kissasian.dev/';
-      }
-      await _player.open(Media(url, httpHeaders: headers));
-
-      if (_showResumeDialog) {
-        await _player.pause();
-        if (mounted) {
-          setState(() {
-            _isInitializing = false;
-            _isPlaying = false;
-            _showControls = true;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _isInitializing = false;
-            _isPlaying = true;
-            _showControls = true;
-          });
-        }
-        _startPositionSaveTimer();
-      }
-      _resetHideTimer();
-      _saveWatchHistory();
-    } catch (e) {
-      debugPrint('DramaWatch: MK failed to open $url - $e');
-      if (!_useVlc) {
-        _useVlc = true;
-        _initVlcPlayer(url);
-      } else if (mounted) {
+  void _tryVlcFallback() {
+    if (_sources.isEmpty) {
+      if (mounted) {
         setState(() {
           _isInitializing = false;
           _hasError = true;
-          _errorMessage = 'Failed to load video: $e';
+          _errorMessage = 'No servers available for VLC fallback.';
         });
       }
+      return;
     }
-  }
-
-  void _tryVlcFallback() {
     _useVlc = true;
     _trySourceIndex = 0;
     _tryLinkIndex = _findEpisodeLink(_sources.first);
     _selectedSourceIndex = 0;
+    if (_tryLinkIndex >= _sources.first.links.length) {
+      _trySourceIndex++;
+      _tryNextSource();
+      return;
+    }
     final url = _sources.first.links[_tryLinkIndex].url;
+    if (url.isEmpty) {
+      _trySourceIndex++;
+      _tryNextSource();
+      return;
+    }
     _initVlcPlayer(url);
   }
 
@@ -539,17 +515,16 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     if (v.hasError && mounted && !_vlcError) {
       _vlcError = true;
       debugPrint('DramaWatch: VLC error: ${v.errorDescription}');
-      _trySourceIndex++;
-      if (_trySourceIndex < _sources.length) {
+      if (_trySourceIndex + 1 < _sources.length) {
+        _trySourceIndex++;
         _vlcError = false;
         final nextSource = _sources[_trySourceIndex];
         final nextLinkIdx = _findEpisodeLink(nextSource);
-        if (nextLinkIdx < nextSource.links.length) {
+        if (nextLinkIdx >= 0 && nextLinkIdx < nextSource.links.length) {
           _selectedSourceIndex = _trySourceIndex;
           _selectedLinkIndex = nextLinkIdx;
           _initVlcPlayer(nextSource.links[nextLinkIdx].url);
         } else {
-          _trySourceIndex++;
           _vlcListener();
         }
       } else {
@@ -579,21 +554,26 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     final newEp = _currentEpisode + delta;
     if (newEp < 1 || newEp > widget.episodes.length) return;
     _saveCurrentPosition();
+    _positionSaveTimer?.cancel();
     setState(() => _currentEpisode = newEp);
     _loadStream();
   }
 
   void _switchServer(int sourceIndex) {
     if (sourceIndex < 0 || sourceIndex >= _sources.length) return;
+    final source = _sources[sourceIndex];
+    if (source.links.isEmpty) return;
     _saveCurrentPosition();
     _selectedSourceIndex = sourceIndex;
-    _selectedLinkIndex = _findEpisodeLink(_sources[sourceIndex]);
-    final url = _sources[sourceIndex].links[_selectedLinkIndex].url;
+    _selectedLinkIndex = _findEpisodeLink(source);
+    if (_selectedLinkIndex < 0 || _selectedLinkIndex >= source.links.length) _selectedLinkIndex = 0;
+    final url = source.links[_selectedLinkIndex].url;
+    if (url.isEmpty) return;
     setState(() {
       _isInitializing = true;
       _hasError = false;
     });
-    _initializePlayer(url);
+    _initializePlayerWithRetry(url);
   }
 
   void _showServerSelector() {
@@ -932,7 +912,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                     Text(_formatDuration(_position), style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
                     Row(
                       children: [
-                        if (_sources.length > 1)
+                        if (_sources.length > 1 && _selectedSourceIndex < _sources.length)
                           GestureDetector(
                             onTap: _showServerSelector,
                             child: Container(
@@ -947,7 +927,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                               ),
                             ),
                           ),
-                        if (_sources.length > 1) const SizedBox(width: 12),
+                        if (_sources.length > 1 && _selectedSourceIndex < _sources.length) const SizedBox(width: 12),
                         if (_currentEpisode > 1)
                           GestureDetector(
                             onTap: () => _changeEpisode(-1),
