@@ -7,7 +7,6 @@ import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'anime_detail.dart';
 import 'drama_detail.dart';
-import 'drama_watch.dart';
 import 'watch.dart';
 import 'settings.dart';
 
@@ -39,15 +38,16 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  Future<void> _navigateToAnime(int animeId, {bool isDrama = false}) async {
+  Future<void> _navigateToAnime(int animeId, {bool isDrama = false, String title = ''}) async {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: NipahLoader(size: 32)),
     );
     if (isDrama) {
-      final dramas = await searchDramas('');
-      final drama = dramas.firstWhere((d) => d.id == animeId, orElse: () => Drama(id: animeId, title: 'Drama'));
+      // Search for the drama by title
+      final dramas = await searchDramas(title);
+      final drama = dramas.firstWhere((d) => d.id == animeId, orElse: () => Drama(id: animeId, title: title));
       if (mounted) Navigator.pop(context);
       if (mounted) {
         Navigator.push(context, MaterialPageRoute(builder: (_) => DramaDetailPage(drama: drama)));
@@ -156,7 +156,7 @@ class _HistoryPageState extends State<HistoryPage> {
           item: item,
           timeAgo: _timeAgo(item['watchedAt'] ?? 0),
           isDrama: isDrama,
-          onTap: () => _navigateToAnime(item['anilistId'] ?? 0, isDrama: isDrama),
+          onTap: () => _navigateToAnime(item['anilistId'] ?? 0, isDrama: isDrama, title: item['animeTitle'] ?? ''),
           onDelete: () async {
             await removeFromHistory(index);
             _loadHistory();
@@ -293,16 +293,16 @@ class _NipahHistoryItem extends StatelessWidget {
                   final animeTitle = item['animeTitle'] ?? '';
                   final coverImage = item['coverImage'] ?? '';
                   if (isDrama) {
+                    final drama = Drama(
+                      id: animeId,
+                      title: animeTitle,
+                      poster: coverImage,
+                      backdrop: coverImage,
+                    );
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => DramaWatchPage(
-                          title: animeTitle,
-                          episode: episode,
-                          mediaId: animeId,
-                          episodes: [],
-                          coverImage: coverImage,
-                        ),
+                        builder: (_) => DramaDetailPage(drama: drama),
                       ),
                     );
                   } else {
