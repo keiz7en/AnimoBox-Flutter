@@ -342,7 +342,7 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
       );
     }
     if (_dramaResults.isEmpty) {
-      final dramaQuickSearches = ['Crash Landing', 'Squid Game', 'Boys Over Flowers', 'Goblin', 'Descendants of the Sun', 'Vincenzo'];
+      final dramaQuickSearches = ['Squid Game', 'Crash Landing', 'Vincenzo', 'One Piece', 'Naruto', 'Movie'];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

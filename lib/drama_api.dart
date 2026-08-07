@@ -26,16 +26,16 @@ Future<List<Drama>> searchDramas(String query) async {
 
 Future<List<Drama>> getRecentDramas() async {
   try {
-    final queries = ['2026', '2025', 'love', 'romance'];
+    final queries = ['2026', 'love', 'show', 'movie', 'thai'];
     final results = <Drama>[];
     for (final q in queries) {
       final dramas = await searchDramas(q);
       for (final d in dramas) {
         if (!results.any((r) => r.id == d.id)) results.add(d);
       }
-      if (results.length >= 30) break;
+      if (results.length >= 40) break;
     }
-    return results.take(30).toList();
+    return results.take(40).toList();
   } catch (_) {
     return [];
   }
@@ -43,16 +43,16 @@ Future<List<Drama>> getRecentDramas() async {
 
 Future<List<Drama>> getPopularDramas() async {
   try {
-    final queries = ['love', 'heart', 'home', 'family'];
+    final queries = ['love', 'show', 'movie', 'korean', 'japanese'];
     final results = <Drama>[];
     for (final q in queries) {
       final dramas = await searchDramas(q);
       for (final d in dramas) {
         if (!results.any((r) => r.id == d.id)) results.add(d);
       }
-      if (results.length >= 30) break;
+      if (results.length >= 40) break;
     }
-    return results.take(30).toList();
+    return results.take(40).toList();
   } catch (_) {
     return [];
   }
@@ -60,16 +60,16 @@ Future<List<Drama>> getPopularDramas() async {
 
 Future<List<Drama>> getNewDramas() async {
   try {
-    final queries = ['school', 'king', 'moon', 'sun'];
+    final queries = ['chinese', 'hollywood', 'family', 'action', 'comedy'];
     final results = <Drama>[];
     for (final q in queries) {
       final dramas = await searchDramas(q);
       for (final d in dramas) {
         if (!results.any((r) => r.id == d.id)) results.add(d);
       }
-      if (results.length >= 30) break;
+      if (results.length >= 40) break;
     }
-    return results.take(30).toList();
+    return results.take(40).toList();
   } catch (_) {
     return [];
   }
