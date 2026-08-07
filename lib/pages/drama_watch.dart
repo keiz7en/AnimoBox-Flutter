@@ -46,6 +46,9 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   Duration _lastSavedPosition = Duration.zero;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  List<StreamSource> _sources = [];
+  int _selectedSourceIndex = 0;
+  int _selectedLinkIndex = 0;
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
@@ -225,18 +228,23 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     });
 
     try {
-      final videoUrl = await getDramaVideoUrl(widget.mediaId, _currentEpisode);
-      if (videoUrl == null || videoUrl.isEmpty) {
+      final sources = await getDramaStreamSources(widget.mediaId, _currentEpisode);
+      if (mounted) setState(() => _sources = sources);
+
+      if (sources.isEmpty) {
         if (mounted) {
           setState(() {
             _isInitializing = false;
             _hasError = true;
-            _errorMessage = 'No video source found.';
+            _errorMessage = 'No streaming sources found.';
           });
         }
         return;
       }
-      await _initializePlayer(videoUrl);
+
+      _selectedSourceIndex = 0;
+      _selectedLinkIndex = _findEpisodeLink(sources.first);
+      await _initializePlayer(sources.first.links[_selectedLinkIndex].url);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -246,6 +254,13 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         });
       }
     }
+  }
+
+  int _findEpisodeLink(StreamSource source) {
+    for (int i = 0; i < source.links.length; i++) {
+      if (source.links[i].quality.contains('$_currentEpisode')) return i;
+    }
+    return 0;
   }
 
   Future<void> _initializePlayer(String url) async {
@@ -309,6 +324,52 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _saveCurrentPosition();
     setState(() => _currentEpisode = newEp);
     _loadStream();
+  }
+
+  void _switchServer(int sourceIndex) {
+    if (sourceIndex < 0 || sourceIndex >= _sources.length) return;
+    _selectedSourceIndex = sourceIndex;
+    _selectedLinkIndex = _findEpisodeLink(_sources[sourceIndex]);
+    _initializePlayer(_sources[sourceIndex].links[_selectedLinkIndex].url);
+  }
+
+  void _showServerSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: NipahColors.surface,
+          border: Border(top: BorderSide(color: NipahColors.accent.main.withValues(alpha: 0.3))),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 32, height: 4,
+                decoration: BoxDecoration(color: NipahColors.textDim, borderRadius: BorderRadius.circular(2)),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(L10n.t('selectServer'), style: NipahTheme.heading(size: 16)),
+              ),
+              ...List.generate(_sources.length, (i) {
+                final s = _sources[i];
+                final isSelected = i == _selectedSourceIndex;
+                return ListTile(
+                  title: Text(s.server, style: NipahTheme.body(size: 14, color: isSelected ? NipahColors.gold : NipahColors.text)),
+                  trailing: isSelected ? Icon(Icons.check_circle, color: NipahColors.gold, size: 20) : null,
+                  onTap: () { Navigator.pop(ctx); _switchServer(i); },
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -573,6 +634,22 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                     Text(_formatDuration(_position), style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
                     Row(
                       children: [
+                        if (_sources.length > 1)
+                          GestureDetector(
+                            onTap: _showServerSelector,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: NipahColors.accent.main.withValues(alpha: 0.4)),
+                                color: NipahColors.accent.main.withValues(alpha: 0.1),
+                              ),
+                              child: Text(
+                                _sources[_selectedSourceIndex].server,
+                                style: NipahTheme.label(size: 9, color: NipahColors.gold),
+                              ),
+                            ),
+                          ),
+                        if (_sources.length > 1) const SizedBox(width: 12),
                         if (_currentEpisode > 1)
                           GestureDetector(
                             onTap: () => _changeEpisode(-1),

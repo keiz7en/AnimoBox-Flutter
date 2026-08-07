@@ -96,16 +96,32 @@ Future<String?> getDramaVideoUrl(int mediaId, int episodeNumber) async {
     final res = await http.get(Uri.parse(url), headers: _headers()).timeout(const Duration(seconds: 8));
     if (res.statusCode != 200) return null;
     final data = jsonDecode(res.body);
+
+    // Try top-level episodes first (has videoUrl)
+    final topEpisodes = data['episodes'] as List?;
+    if (topEpisodes != null) {
+      for (final ep in topEpisodes) {
+        if (ep['number'] == episodeNumber) {
+          final videoUrl = ep['videoUrl'] as String?;
+          if (videoUrl != null && videoUrl.isNotEmpty) return videoUrl;
+        }
+      }
+    }
+
+    // Fallback to servers
     final servers = data['servers'] as List?;
     if (servers == null || servers.isEmpty) return null;
-    final firstServer = servers[0];
-    final episodes = firstServer['episodes'] as List?;
-    if (episodes == null || episodes.isEmpty) return null;
-    final ep = episodes.firstWhere(
-      (e) => e['number'] == episodeNumber,
-      orElse: () => episodes[0],
-    );
-    return ep['url'] as String?;
+    for (final server in servers) {
+      final episodes = server['episodes'] as List?;
+      if (episodes == null || episodes.isEmpty) continue;
+      for (final ep in episodes) {
+        if (ep['number'] == episodeNumber) {
+          final videoUrl = ep['url'] as String?;
+          if (videoUrl != null && videoUrl.isNotEmpty) return videoUrl;
+        }
+      }
+    }
+    return null;
   } catch (_) {
     return null;
   }
@@ -117,30 +133,42 @@ Future<List<StreamSource>> getDramaStreamSources(int mediaId, int episodeNumber)
     final res = await http.get(Uri.parse(url), headers: _headers()).timeout(const Duration(seconds: 8));
     if (res.statusCode != 200) return [];
     final data = jsonDecode(res.body);
-    final servers = data['servers'] as List?;
-    if (servers == null || servers.isEmpty) return [];
     final sources = <StreamSource>[];
-    for (final server in servers) {
-      final name = server['name'] ?? 'Server';
-      final episodes = server['episodes'] as List?;
-      if (episodes == null) continue;
+
+    // Add top-level episodes as "Auto" server
+    final topEpisodes = data['episodes'] as List?;
+    if (topEpisodes != null && topEpisodes.isNotEmpty) {
       final links = <StreamLink>[];
-      for (final ep in episodes) {
-        final videoUrl = ep['url'] as String?;
+      for (final ep in topEpisodes) {
+        final videoUrl = ep['videoUrl'] as String?;
         final epNum = ep['number'] ?? episodeNumber;
         if (videoUrl != null && videoUrl.isNotEmpty) {
-          links.add(StreamLink(
-            url: videoUrl,
-            quality: 'Ep $epNum',
-          ));
+          links.add(StreamLink(url: videoUrl, quality: 'Ep $epNum'));
         }
       }
       if (links.isNotEmpty) {
-        sources.add(StreamSource(
-          server: name,
-          type: 'drama',
-          links: links,
-        ));
+        sources.add(StreamSource(server: 'Auto', type: 'drama', links: links));
+      }
+    }
+
+    // Add named servers
+    final servers = data['servers'] as List?;
+    if (servers != null) {
+      for (final server in servers) {
+        final name = server['name'] ?? 'Server';
+        final episodes = server['episodes'] as List?;
+        if (episodes == null || episodes.isEmpty) continue;
+        final links = <StreamLink>[];
+        for (final ep in episodes) {
+          final videoUrl = ep['url'] as String?;
+          final epNum = ep['number'] ?? episodeNumber;
+          if (videoUrl != null && videoUrl.isNotEmpty) {
+            links.add(StreamLink(url: videoUrl, quality: 'Ep $epNum'));
+          }
+        }
+        if (links.isNotEmpty) {
+          sources.add(StreamSource(server: name, type: 'drama', links: links));
+        }
       }
     }
     return sources;
