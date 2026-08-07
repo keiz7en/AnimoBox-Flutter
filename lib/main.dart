@@ -71,7 +71,7 @@ class AnimoBoxApp extends StatelessWidget {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.zero,
-            side: BorderSide(color: NipahColors.cardBorder),
+            side: BorderSide(color: NipahColors.accent.main.withValues(alpha: 0.18)),
           ),
         ),
         appBarTheme: AppBarTheme(

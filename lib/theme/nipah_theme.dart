@@ -236,22 +236,27 @@ class NipahTheme {
 
   static BoxDecoration get cardDecoration => BoxDecoration(
     color: NipahColors.surface,
-    border: Border.fromBorderSide(BorderSide(color: NipahColors.cardBorder)),
+    border: Border.all(color: NipahColors.accent.main.withValues(alpha: 0.18)),
+    boxShadow: [
+      BoxShadow(color: NipahColors.accent.main.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4)),
+    ],
   );
 
   static BoxDecoration get heroCardDecoration => BoxDecoration(
     color: NipahColors.surface,
-    border: Border.fromBorderSide(BorderSide(color: NipahColors.cardBorder)),
-    boxShadow: [BoxShadow(color: NipahColors.shadow, blurRadius: 48, offset: const Offset(0, 16))],
+    border: Border.all(color: NipahColors.accent.main.withValues(alpha: 0.25)),
+    boxShadow: [
+      BoxShadow(color: NipahColors.accent.main.withValues(alpha: 0.10), blurRadius: 48, offset: const Offset(0, 16)),
+    ],
   );
 
   static BoxDecoration get sectionCardDecoration => BoxDecoration(
-    border: Border.fromBorderSide(BorderSide(color: NipahColors.lineSoft)),
+    border: Border.all(color: NipahColors.accent.main.withValues(alpha: 0.12)),
     gradient: LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        NipahColors.accent.main.withValues(alpha: 0.08),
+        NipahColors.accent.main.withValues(alpha: 0.10),
         NipahColors.text.withValues(alpha: 0.02),
         NipahColors.surface,
       ],

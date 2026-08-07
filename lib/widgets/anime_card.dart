@@ -95,9 +95,14 @@ class _AnimeCardState extends State<AnimeCard> {
               : Matrix4.identity(),
           decoration: BoxDecoration(
             color: NipahColors.surface,
-            border: Border.fromBorderSide(
-              BorderSide(color: NipahColors.cardBorder),
-            ),
+            border: Border.all(color: NipahColors.accent.main.withValues(alpha: _isHovered ? 0.40 : 0.18)),
+            boxShadow: [
+              BoxShadow(
+                color: NipahColors.accent.main.withValues(alpha: _isHovered ? 0.14 : 0.06),
+                blurRadius: _isHovered ? 20 : 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
