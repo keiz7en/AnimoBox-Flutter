@@ -131,7 +131,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           data = await getRecentDramas();
           break;
         case 2:
-          data = await getPopularDramas();
+          data = await getAiringDramas();
           break;
         default:
           data = [];
@@ -639,7 +639,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             tabs: [
               Tab(text: L10n.t('newDramas')),
               Tab(text: L10n.t('recent')),
-              Tab(text: L10n.t('popular')),
+              Tab(text: L10n.t('airing')),
             ],
           ),
           if (_appMode == 'drama')
@@ -685,7 +685,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _buildSectionHeader() {
     final idx = _tabController.index;
-    final labels = [L10n.t('newDramas'), L10n.t('recent'), L10n.t('popular')];
+    final labels = [L10n.t('newDramas'), L10n.t('recent'), L10n.t('airing')];
     final countryLabel = _selectedCountry ?? '';
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),

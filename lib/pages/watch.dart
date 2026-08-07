@@ -409,53 +409,68 @@ class _WatchPageState extends State<WatchPage> {
     });
   }
 
-  void _initVlcPlayer(String url, StreamSource source) {
+  Future<void> _initVlcPlayer(String url, StreamSource source) async {
     _vlcController?.removeListener(_vlcListener);
     _vlcController?.dispose();
+    _vlcController = null;
 
-    final headers = _getHeadersForSource(source);
-    final httpOptsList = <String>[
-      VlcHttpOptions.httpReconnect(true),
-      VlcHttpOptions.httpContinuous(true),
-      VlcHttpOptions.httpUserAgent(_defaultUA),
-    ];
-    if (headers['Referer'] != null) {
-      httpOptsList.add(VlcHttpOptions.httpReferrer(headers['Referer']!));
-    }
+    if (mounted) setState(() => _isInitializing = true);
 
-    _vlcController = VlcPlayerController.network(
-      url,
-      hwAcc: HwAcc.auto,
-      autoPlay: true,
-      options: VlcPlayerOptions(
-        http: VlcHttpOptions(httpOptsList),
-        advanced: VlcAdvancedOptions([
-          VlcAdvancedOptions.networkCaching(5000),
-        ]),
-      ),
-    );
+    try {
+      final headers = _getHeadersForSource(source);
+      final httpOptsList = <String>[
+        VlcHttpOptions.httpReconnect(true),
+        VlcHttpOptions.httpContinuous(true),
+        VlcHttpOptions.httpUserAgent(_defaultUA),
+      ];
+      if (headers['Referer'] != null) {
+        httpOptsList.add(VlcHttpOptions.httpReferrer(headers['Referer']!));
+      }
 
-    _vlcController!.addListener(_vlcListener);
+      _vlcController = VlcPlayerController.network(
+        url,
+        hwAcc: HwAcc.disabled,
+        autoPlay: true,
+        options: VlcPlayerOptions(
+          http: VlcHttpOptions(httpOptsList),
+          advanced: VlcAdvancedOptions([
+            VlcAdvancedOptions.networkCaching(5000),
+          ]),
+        ),
+      );
 
-    if (mounted) {
-      setState(() {
-        _isInitializing = false;
-        _showControls = true;
-      });
-      if (_showResumeDialog) {
-        _vlcController?.pause();
+      await _vlcController!.initialize();
+      _vlcController!.addListener(_vlcListener);
+
+      if (mounted) {
         setState(() {
-          _isPlaying = false;
+          _isInitializing = false;
           _showControls = true;
         });
-      } else {
-        _isPlaying = true;
-        _startPositionSaveTimer();
+        if (_showResumeDialog) {
+          _vlcController?.pause();
+          setState(() {
+            _isPlaying = false;
+            _showControls = true;
+          });
+        } else {
+          _isPlaying = true;
+          _startPositionSaveTimer();
+        }
+      }
+      _resetHideTimer();
+      _saveWatchHistory();
+      debugPrint('Watch: VLC player initialized for $url');
+    } catch (e) {
+      debugPrint('Watch: VLC init failed for $url - $e');
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _hasError = true;
+          _errorMessage = 'VLC player failed: $e';
+        });
       }
     }
-    _resetHideTimer();
-    _saveWatchHistory();
-    debugPrint('Watch: VLC player initialized for $url');
   }
 
   void _vlcListener() {

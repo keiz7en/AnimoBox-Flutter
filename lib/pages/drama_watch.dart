@@ -451,42 +451,57 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _initVlcPlayer(url);
   }
 
-  void _initVlcPlayer(String url) {
+  Future<void> _initVlcPlayer(String url) async {
     _vlcController?.removeListener(_vlcListener);
     _vlcController?.dispose();
+    _vlcController = null;
 
-    final httpOptsList = <String>[
-      VlcHttpOptions.httpReconnect(true),
-      VlcHttpOptions.httpContinuous(true),
-      VlcHttpOptions.httpUserAgent(_dramaUA),
-    ];
-    if (url.contains('.m3u8')) {
-      httpOptsList.add(VlcHttpOptions.httpReferrer('https://kissasian.dev/'));
+    if (mounted) setState(() => _isInitializing = true);
+
+    try {
+      final httpOptsList = <String>[
+        VlcHttpOptions.httpReconnect(true),
+        VlcHttpOptions.httpContinuous(true),
+        VlcHttpOptions.httpUserAgent(_dramaUA),
+      ];
+      if (url.contains('.m3u8')) {
+        httpOptsList.add(VlcHttpOptions.httpReferrer('https://kissasian.dev/'));
+      }
+
+      _vlcController = VlcPlayerController.network(
+        url,
+        hwAcc: HwAcc.disabled,
+        autoPlay: true,
+        options: VlcPlayerOptions(
+          http: VlcHttpOptions(httpOptsList),
+          advanced: VlcAdvancedOptions([
+            VlcAdvancedOptions.networkCaching(5000),
+          ]),
+        ),
+      );
+
+      await _vlcController!.initialize();
+      _vlcController!.addListener(_vlcListener);
+
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _showControls = true;
+        });
+      }
+      _resetHideTimer();
+      _saveWatchHistory();
+      debugPrint('DramaWatch: VLC player initialized for $url');
+    } catch (e) {
+      debugPrint('DramaWatch: VLC init failed for $url - $e');
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _hasError = true;
+          _errorMessage = 'VLC player failed: $e';
+        });
+      }
     }
-
-    _vlcController = VlcPlayerController.network(
-      url,
-      hwAcc: HwAcc.auto,
-      autoPlay: true,
-      options: VlcPlayerOptions(
-        http: VlcHttpOptions(httpOptsList),
-        advanced: VlcAdvancedOptions([
-          VlcAdvancedOptions.networkCaching(5000),
-        ]),
-      ),
-    );
-
-    _vlcController!.addListener(_vlcListener);
-
-    if (mounted) {
-      setState(() {
-        _isInitializing = false;
-        _showControls = true;
-      });
-    }
-    _resetHideTimer();
-    _saveWatchHistory();
-    debugPrint('DramaWatch: VLC player initialized for $url');
   }
 
   void _vlcListener() {

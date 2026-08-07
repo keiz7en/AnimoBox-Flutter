@@ -92,6 +92,26 @@ Future<List<Drama>> getPopularDramas() async {
   }
 }
 
+Future<List<Drama>> getAiringDramas() async {
+  try {
+    final queries = ['2026', 'ongoing', 'airing', 'new', 'latest'];
+    final futures = queries.map((q) => searchDramas(q)).toList();
+    final results = await Future.wait(futures);
+    final seen = <String>{};
+    final dramas = <Drama>[];
+    for (final list in results) {
+      for (final d in list) {
+        final key = '${d.id}_${d.title}';
+        if (seen.add(key)) dramas.add(d);
+      }
+    }
+    return dramas.take(40).toList();
+  } catch (e) {
+    debugPrint('DramaAPI: getAiringDramas failed: $e');
+    return [];
+  }
+}
+
 Future<List<Drama>> getNewDramas() async {
   try {
     final queries = ['chinese', 'hollywood', 'family', 'action', 'comedy'];
