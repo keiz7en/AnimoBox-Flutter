@@ -106,10 +106,8 @@ class _WatchPageState extends State<WatchPage> {
     });
 
     _player.stream.error.listen((error) {
-      if (mounted && error.isNotEmpty && !_useVlc) {
-        debugPrint('Watch: MK error: $error - trying VLC fallback');
-        _useVlc = true;
-        _tryVlcForCurrentSource();
+      if (mounted && error.isNotEmpty) {
+        debugPrint('Watch: MK stream error: $error');
       }
     });
 
@@ -357,19 +355,18 @@ class _WatchPageState extends State<WatchPage> {
       _resetHideTimer();
       _saveWatchHistory();
     } catch (e) {
-      setState(() {
-        _isInitializing = false;
-        _hasError = true;
-        _errorMessage = 'Failed to load video: $e';
-      });
+      debugPrint('Watch: MK failed to open $url - $e, trying VLC');
+      if (!_useVlc) {
+        _useVlc = true;
+        _initVlcPlayer(url, source);
+      } else {
+        setState(() {
+          _isInitializing = false;
+          _hasError = true;
+          _errorMessage = 'Failed to load video: $e';
+        });
+      }
     }
-  }
-
-  void _tryVlcForCurrentSource() {
-    if (_sources.isEmpty) return;
-    final source = _sources[_selectedSourceIndex];
-    final url = source.links[_selectedLinkIndex].url;
-    _initVlcPlayer(url, source);
   }
 
   void _initVlcPlayer(String url, StreamSource source) {

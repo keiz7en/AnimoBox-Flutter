@@ -59,8 +59,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   int _selectedLinkIndex = 0;
   int _trySourceIndex = 0;
   int _tryLinkIndex = 0;
-  bool _isRetrying = false;
-  int _mkFailCount = 0;
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
@@ -104,17 +102,8 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     });
 
     _player.stream.error.listen((error) {
-      if (mounted && error.isNotEmpty && !_useVlc && !_isRetrying) {
-        _mkFailCount++;
-        _isRetrying = true;
-        debugPrint('DramaWatch: MK error: $error (attempt $_mkFailCount)');
-        _trySourceIndex++;
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            _isRetrying = false;
-            _tryNextSource();
-          }
-        });
+      if (mounted && error.isNotEmpty) {
+        debugPrint('DramaWatch: MK stream error: $error');
       }
     });
 
@@ -302,7 +291,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       _historySaved = false;
       _useVlc = false;
       _vlcError = false;
-      _mkFailCount = 0;
     });
 
     try {
@@ -370,10 +358,24 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         headers['Referer'] = 'https://kissasian.dev/';
       }
       await _player.open(Media(url, httpHeaders: headers));
+      _saveWatchHistory();
+      if (_showResumeDialog) {
+        await _player.pause();
+        if (mounted) setState(() { _isInitializing = false; _isPlaying = false; _showControls = true; });
+      } else {
+        if (mounted) setState(() { _isInitializing = false; _isPlaying = true; _showControls = true; });
+        _startPositionSaveTimer();
+      }
+      _resetHideTimer();
     } catch (e) {
-      debugPrint('DramaWatch: Failed to open $url - $e');
-      _trySourceIndex++;
-      _tryNextSource();
+      debugPrint('DramaWatch: MK failed to open $url - $e');
+      if (!_useVlc) {
+        _useVlc = true;
+        _initVlcPlayer(url);
+      } else {
+        _trySourceIndex++;
+        _tryNextSource();
+      }
     }
   }
 
@@ -412,7 +414,11 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       _resetHideTimer();
       _saveWatchHistory();
     } catch (e) {
-      if (mounted) {
+      debugPrint('DramaWatch: MK failed to open $url - $e');
+      if (!_useVlc) {
+        _useVlc = true;
+        _initVlcPlayer(url);
+      } else if (mounted) {
         setState(() {
           _isInitializing = false;
           _hasError = true;
