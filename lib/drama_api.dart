@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'models.dart';
 
@@ -15,7 +16,9 @@ String _parseVideoUrl(String raw) {
   if (raw.isEmpty) return raw;
   // Format can be: "url|lang|subtitleUrl" or just "url"
   final parts = raw.split('|');
-  return parts.first.trim();
+  final clean = parts.first.trim();
+  if (clean != raw) debugPrint('DramaAPI: Parsed URL: $clean (from: $raw)');
+  return clean;
 }
 
 Future<List<Drama>> searchDramas(String query) async {

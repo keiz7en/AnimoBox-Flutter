@@ -93,6 +93,16 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       }
     });
 
+    _player.stream.error.listen((error) {
+      if (mounted && error.isNotEmpty) {
+        setState(() {
+          _isInitializing = false;
+          _hasError = true;
+          _errorMessage = 'Player error: $error';
+        });
+      }
+    });
+
     _init();
   }
 
@@ -268,11 +278,15 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   Future<void> _initializePlayer(String url) async {
     try {
       await _player.stop();
+      debugPrint('DramaWatch: Playing URL: $url');
+      final headers = <String, String>{
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      };
+      if (url.contains('.m3u8')) {
+        headers['Referer'] = 'https://kissasian.dev/';
+      }
       await _player.open(
-        Media(url, httpHeaders: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          'Referer': 'https://kissasian.dev/',
-        }),
+        Media(url, httpHeaders: headers),
       );
 
       if (_showResumeDialog) {
