@@ -767,7 +767,7 @@ class _DramaCard extends StatelessWidget {
                       child: Icon(Icons.tv, color: NipahColors.textDim),
                     ),
                   ),
-                  if (drama.status.isNotEmpty && drama.status.toLowerCase() != 'completed')
+                  if (drama.isOngoing)
                     Positioned(
                       top: 0,
                       left: 0,

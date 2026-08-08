@@ -66,7 +66,7 @@ Future<List<Drama>> getPopularDramas() async {
     for (final list in results) {
       for (final d in list) {
         if (seen.add(d.id)) {
-          if (d.status.toLowerCase() == 'ongoing') {
+          if (d.isOngoing) {
             ongoing.add(d);
           } else {
             completed.add(d);
@@ -229,7 +229,7 @@ Future<List<Drama>> getDramasByCountry(String country) async {
               (country == 'Japanese' && dCountry == 'japan') ||
               (country == 'Korean' && dCountry == 'south korea') ||
               (country == 'Chinese' && (dCountry == 'china' || dCountry == 'hong kong' || dCountry == 'taiwan'))) {
-            if (d.status.toLowerCase() == 'ongoing') {
+            if (d.isOngoing) {
               ongoing.add(d);
             } else {
               completed.add(d);
@@ -242,7 +242,7 @@ Future<List<Drama>> getDramasByCountry(String country) async {
       for (final list in results) {
         for (final d in list) {
           if (seen.add(d.id)) {
-            if (d.status.toLowerCase() == 'ongoing') {
+            if (d.isOngoing) {
               ongoing.add(d);
             } else {
               completed.add(d);
@@ -266,7 +266,7 @@ Future<List<Drama>> getAiringDramasByCountry(String country) async {
     final dramas = <Drama>[];
     for (final list in results) {
       for (final d in list) {
-        if (seen.add(d.id) && d.status.toLowerCase() != 'completed') dramas.add(d);
+        if (seen.add(d.id) && d.isOngoing) dramas.add(d);
       }
     }
     return dramas.take(30).toList();

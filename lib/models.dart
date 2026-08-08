@@ -161,6 +161,8 @@ class Drama {
   final String description;
   final String duration;
   final String year;
+  final int serverEpisodesCount;
+  final int createdAt;
 
   Drama({
     required this.id,
@@ -176,7 +178,19 @@ class Drama {
     this.description = '',
     this.duration = '',
     this.year = '',
+    this.serverEpisodesCount = 0,
+    this.createdAt = 0,
   });
+
+  bool get isOngoing {
+    if (status.toLowerCase() == 'ongoing') return true;
+    final epCount = serverEpisodesCount > 0 ? serverEpisodesCount : episodes;
+    if (epCount <= 1) return false;
+    if (createdAt <= 0) return epCount > 1;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    return (now - createdAt) < thirtyDaysMs;
+  }
 
   factory Drama.fromKissAsian(Map<String, dynamic> json) {
     return Drama(
@@ -193,6 +207,8 @@ class Drama {
       description: json['description'] ?? '',
       duration: json['duration'] ?? '',
       year: json['year'] ?? '',
+      serverEpisodesCount: json['serverEpisodesCount'] ?? 0,
+      createdAt: json['createdAt'] ?? 0,
     );
   }
 
