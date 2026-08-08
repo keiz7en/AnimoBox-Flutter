@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -114,61 +115,72 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnim;
-  late Animation<double> _scaleAnim;
-  late Animation<double> _glowAnim;
+class _SplashScreenState extends State<SplashScreen> {
+  late final Player _player;
+  late final VideoController _controller;
+  bool _navigating = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000));
-    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.15, curve: Curves.easeOut)),
-    );
-    _scaleAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.2, curve: Curves.easeOutBack)),
-    );
-    _glowAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.1, 0.5, curve: Curves.easeInOut)),
-    );
-    _controller.forward();
+    _player = Player();
+    _controller = VideoController(_player);
+    _initPlayer();
+  }
 
-    Future.delayed(const Duration(milliseconds: 3000), () async {
-      if (!mounted) return;
-      try {
-        final info = await PackageInfo.fromPlatform();
-        final update = await checkForUpdate();
-        if (update != null && mounted) {
-          final latest = update['version'] ?? '';
-          if (needsForceUpdate(info.version, latest)) {
-            if (!mounted) return;
-            _showForceUpdateDialog(update);
-            return;
-          }
-        }
-      } catch (_) {}
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const MainScreen(),
-            transitionsBuilder: (_, anim, __, child) {
-              return FadeTransition(
-                opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
-                child: child,
-              );
-            },
-            transitionDuration: const Duration(milliseconds: 350),
-          ),
-        );
+  Future<void> _initPlayer() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/limesugar_intro.mp4');
+      if (!await file.exists()) {
+        final data = await rootBundle.load('assets/limesugar_intro.mp4');
+        await file.writeAsBytes(data.buffer.asUint8List());
       }
-    });
+      await _player.open(Media(file.path));
+      _player.stream.completed.listen((completed) {
+        if (completed && mounted && !_navigating) {
+          _navigateToMain();
+        }
+      });
+    } catch (_) {
+      if (mounted) _navigateToMain();
+    }
+  }
+
+  Future<void> _navigateToMain() async {
+    if (_navigating || !mounted) return;
+    _navigating = true;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final update = await checkForUpdate();
+      if (update != null && mounted) {
+        final latest = update['version'] ?? '';
+        if (needsForceUpdate(info.version, latest)) {
+          if (!mounted) return;
+          _showForceUpdateDialog(update);
+          return;
+        }
+      }
+    } catch (_) {}
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const MainScreen(),
+          transitionsBuilder: (_, anim, __, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 350),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _player.dispose();
     super.dispose();
   }
 
@@ -182,59 +194,21 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    const limeColor = Color(0xFF78C850);
-    const limeStrong = Color(0xFFA0E070);
     return Scaffold(
-      backgroundColor: NipahColors.bg,
+      backgroundColor: const Color(0xFF090a0c),
       body: Center(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Opacity(
-              opacity: _fadeAnim.value,
-              child: Transform.scale(
-                scale: _scaleAnim.value,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [limeColor, limeStrong],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: limeColor.withValues(alpha: _glowAnim.value * 0.6),
-                            blurRadius: 30 + (_glowAnim.value * 25),
-                            spreadRadius: _glowAnim.value * 8,
-                          ),
-                        ],
-                      ),
-                      child: Icon(Icons.movie_filter, color: NipahColors.bg, size: 44),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'LimeSugar',
-                      style: NipahTheme.heading(size: 32).copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                        color: limeColor,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'ANIME  ·  DRAMA  ·  HOLLYWOOD',
-                      style: NipahTheme.label(size: 10, color: NipahColors.textDim, letterSpacing: 1.5),
-                    ),
-                  ],
-                ),
+        child: SizedBox.expand(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: _player.state.width?.toDouble() ?? 1280,
+              height: _player.state.height?.toDouble() ?? 720,
+              child: Video(
+                controller: _controller,
+                controls: (state) => const SizedBox.shrink(),
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
