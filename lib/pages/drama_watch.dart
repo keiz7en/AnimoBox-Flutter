@@ -205,15 +205,10 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _startPositionSaveTimer();
     _player.play();
     if (target.inSeconds > 0) {
-      StreamSubscription? sub;
-      sub = _player.stream.position.listen((_) {
-        if (mounted) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && _player.state.playing) {
           _player.seek(target);
-          sub?.cancel();
         }
-      });
-      Future.delayed(const Duration(seconds: 10), () {
-        if (mounted) sub?.cancel();
       });
     }
   }
