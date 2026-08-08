@@ -59,7 +59,7 @@ Future<List<Drama>> getRecentDramas() async {
 Future<List<Drama>> getPopularDramas() async {
   try {
     final queries = [
-      '2026', '2025', '2024', 'love', 'show', 'movie',
+      'ongoing', 'airing', '2026', '2025', 'love', 'show', 'movie',
       'korean', 'japanese', 'chinese', 'thai', 'filipino',
       'action', 'thriller', 'romance', 'comedy', 'drama',
     ];
@@ -79,7 +79,13 @@ Future<List<Drama>> getPopularDramas() async {
         }
       }
     }
-    ongoing.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    // Sort ongoing by year desc (newest first), then by episode count
+    ongoing.sort((a, b) {
+      final ya = a.yearValue;
+      final yb = b.yearValue;
+      if (ya != yb) return yb.compareTo(ya);
+      return b.serverEpisodesCount.compareTo(a.serverEpisodesCount);
+    });
     completed.sort((a, b) => b.yearValue.compareTo(a.yearValue));
     return [...ongoing, ...completed].take(60).toList();
   } catch (_) {
@@ -271,7 +277,12 @@ Future<List<Drama>> getDramasByCountry(String country) async {
         }
       }
     }
-    ongoing.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    ongoing.sort((a, b) {
+      final ya = a.yearValue;
+      final yb = b.yearValue;
+      if (ya != yb) return yb.compareTo(ya);
+      return b.serverEpisodesCount.compareTo(a.serverEpisodesCount);
+    });
     completed.sort((a, b) => b.yearValue.compareTo(a.yearValue));
     return [...ongoing, ...completed].take(60).toList();
   } catch (_) {
@@ -350,7 +361,12 @@ Future<List<Drama>> getPopularHollywood() async {
         }
       }
     }
-    ongoing.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    ongoing.sort((a, b) {
+      final ya = a.yearValue;
+      final yb = b.yearValue;
+      if (ya != yb) return yb.compareTo(ya);
+      return b.serverEpisodesCount.compareTo(a.serverEpisodesCount);
+    });
     completed.sort((a, b) => b.yearValue.compareTo(a.yearValue));
     return [...ongoing, ...completed].take(60).toList();
   } catch (_) {

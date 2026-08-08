@@ -197,13 +197,27 @@ class Drama {
   }
 
   bool get isOngoing {
-    if (status.toLowerCase() == 'ongoing') return true;
+    // KissAsian API returns broken status/episodes data
+    // Use serverEpisodesCount as primary indicator
     final epCount = serverEpisodesCount > 0 ? serverEpisodesCount : episodes;
-    if (epCount <= 1) return false;
-    if (createdAt <= 0) return epCount > 1;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    return (now - createdAt) < thirtyDaysMs;
+    
+    // If multiple episodes, likely ongoing
+    if (epCount > 1) return true;
+    
+    // Check status field (may be unreliable)
+    if (status.toLowerCase() == 'ongoing') return true;
+    
+    // Check if recently created (within 60 days)
+    if (createdAt > 0) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
+      if ((now - createdAt) < sixtyDaysMs) return true;
+    }
+    
+    // Check year - current year content more likely ongoing
+    if (yearValue >= DateTime.now().year) return true;
+    
+    return false;
   }
 
   factory Drama.fromKissAsian(Map<String, dynamic> json) {

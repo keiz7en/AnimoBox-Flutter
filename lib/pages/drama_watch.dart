@@ -352,7 +352,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       if (url.contains('.m3u8')) {
         headers['Referer'] = 'https://kissasian.dev/';
       }
-      await _player.open(Media(url, httpHeaders: headers))
+      await _player.open(Media(url))
           .timeout(const Duration(seconds: 30), onTimeout: () {
         throw Exception('Timeout');
       });

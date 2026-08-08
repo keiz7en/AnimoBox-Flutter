@@ -268,24 +268,6 @@ class _WatchPageState extends State<WatchPage> {
     _resetHideTimer();
   }
 
-  Map<String, String> _getHeadersForSource(StreamSource source) {
-    final headers = <String, String>{
-      'User-Agent': _defaultUA,
-    };
-
-    if (source.server.contains('AniKoto')) {
-      headers['Referer'] = 'https://anikototv.to/';
-    } else if (source.server.contains('AnimeHeaven')) {
-      headers['Referer'] = 'https://animeheaven.me/';
-    } else if (source.server.contains('Vidplay')) {
-      headers['Referer'] = 'https://vidsrc.cc/';
-    } else {
-      headers['Referer'] = 'https://anikototv.to/';
-    }
-
-    return headers;
-  }
-
   Future<void> _loadStream() async {
     setState(() {
       _isInitializing = true;
@@ -368,9 +350,8 @@ class _WatchPageState extends State<WatchPage> {
     try {
       await _player.stop();
       _startLoadingTimer();
-      final headers = _getHeadersForSource(source);
       await _player.open(
-        Media(url, httpHeaders: headers),
+        Media(url),
       ).timeout(const Duration(seconds: 30), onTimeout: () {
         throw Exception('Timeout');
       });
@@ -981,4 +962,3 @@ class _WatchPageState extends State<WatchPage> {
   }
 }
 
-const String _defaultUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
