@@ -51,6 +51,8 @@ class _WatchPageState extends State<WatchPage> {
   int _tryLinkIndex = 0;
   bool _isRetrying = false;
   String _lastFailedUrl = '';
+  bool _vlcChecked = false;
+  bool _vlcInstalled = false;
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -125,10 +127,20 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   Future<void> _init() async {
+    await _checkVlc();
     final settings = await getSettings();
     _preferredQuality = settings['videoQuality'] ?? 'Auto';
     await _loadSavedPosition();
     _loadStream();
+  }
+
+  Future<void> _checkVlc() async {
+    try {
+      _vlcInstalled = await canLaunchUrl(Uri.parse('vlc://test'));
+    } catch (_) {
+      _vlcInstalled = false;
+    }
+    _vlcChecked = true;
   }
 
   Future<void> _applyAutoRotate() async {
@@ -317,6 +329,11 @@ class _WatchPageState extends State<WatchPage> {
           _lastFailedUrl = lastUrl;
           _errorMessage = 'All servers unavailable. Try again later.';
         });
+        if (lastUrl.isNotEmpty && _vlcInstalled) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) _openInExternalPlayer();
+          });
+        }
       }
       return;
     }
@@ -554,14 +571,26 @@ class _WatchPageState extends State<WatchPage> {
 
   Future<void> _openInExternalPlayer() async {
     if (_lastFailedUrl.isEmpty) return;
-    final vlcUri = Uri.parse('vlc://${_lastFailedUrl}');
-    if (await canLaunchUrl(vlcUri)) {
-      await launchUrl(vlcUri);
-    } else {
-      final genericUri = Uri.parse(_lastFailedUrl);
-      if (await canLaunchUrl(genericUri)) {
-        await launchUrl(genericUri, mode: LaunchMode.externalApplication);
+    if (_vlcInstalled) {
+      final vlcUri = Uri.parse('vlc://${_lastFailedUrl}');
+      if (await canLaunchUrl(vlcUri)) {
+        await launchUrl(vlcUri);
+        return;
       }
+    }
+    final genericUri = Uri.parse(_lastFailedUrl);
+    if (await canLaunchUrl(genericUri)) {
+      await launchUrl(genericUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _openVlcPlayStore() async {
+    final storeUri = Uri.parse('market://details?id=org.videolan.vlc');
+    if (await canLaunchUrl(storeUri)) {
+      await launchUrl(storeUri);
+    } else {
+      final webUri = Uri.parse('https://play.google.com/store/apps/details?id=org.videolan.vlc');
+      await launchUrl(webUri);
     }
   }
 
@@ -713,7 +742,7 @@ class _WatchPageState extends State<WatchPage> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            if (_lastFailedUrl.isNotEmpty)
+            if (_lastFailedUrl.isNotEmpty && _vlcInstalled)
               GestureDetector(
                 onTap: _openInExternalPlayer,
                 child: Container(
@@ -731,7 +760,26 @@ class _WatchPageState extends State<WatchPage> {
                   ),
                 ),
               ),
-            if (_lastFailedUrl.isNotEmpty) const SizedBox(height: 12),
+            if (_lastFailedUrl.isNotEmpty && _vlcInstalled) const SizedBox(height: 12),
+            if (_lastFailedUrl.isNotEmpty && !_vlcInstalled)
+              GestureDetector(
+                onTap: _openVlcPlayStore,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: NipahTheme.goldButtonDecoration,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.download, color: NipahColors.bg, size: 16),
+                      const SizedBox(width: 8),
+                      Text('Install VLC to play', style: NipahTheme.label(size: 11, color: NipahColors.bg)),
+                    ],
+                  ),
+                ),
+              ),
+            if (_lastFailedUrl.isNotEmpty && !_vlcInstalled) const SizedBox(height: 12),
             GestureDetector(
               onTap: _loadStream,
               child: Container(
