@@ -197,17 +197,11 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF090a0c),
       body: Center(
-        child: SizedBox.expand(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: _player.state.width?.toDouble() ?? 1280,
-              height: _player.state.height?.toDouble() ?? 720,
-              child: Video(
-                controller: _controller,
-                controls: (state) => const SizedBox.shrink(),
-              ),
-            ),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Video(
+            controller: _controller,
+            controls: (state) => const SizedBox.shrink(),
           ),
         ),
       ),
