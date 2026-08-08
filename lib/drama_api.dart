@@ -186,3 +186,39 @@ Future<List<StreamSource>> getDramaStreamSources(int mediaId, int episodeNumber)
     return [];
   }
 }
+
+Future<List<Drama>> getDramasByCountry(String country) async {
+  try {
+    final queries = [country, '$country drama', '$country 2024', '$country 2025', '$country love'];
+    final futures = queries.map((q) => searchDramas(q)).toList();
+    final results = await Future.wait(futures);
+    final seen = <int>{};
+    final dramas = <Drama>[];
+    for (final list in results) {
+      for (final d in list) {
+        if (seen.add(d.id)) dramas.add(d);
+      }
+    }
+    return dramas.take(50).toList();
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<List<Drama>> getAiringDramasByCountry(String country) async {
+  try {
+    final queries = [country, '$country ongoing', '$country airing'];
+    final futures = queries.map((q) => searchDramas(q)).toList();
+    final results = await Future.wait(futures);
+    final seen = <int>{};
+    final dramas = <Drama>[];
+    for (final list in results) {
+      for (final d in list) {
+        if (seen.add(d.id) && d.status.toLowerCase() != 'completed') dramas.add(d);
+      }
+    }
+    return dramas.take(30).toList();
+  } catch (_) {
+    return [];
+  }
+}

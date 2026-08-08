@@ -21,6 +21,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late TabController _tabController;
   String _appMode = 'anime';
 
+  static const _dramaCountries = ['All', 'Japanese', 'Korean', 'Chinese', 'Thai', 'Filipino', 'English'];
+
   // Anime data
   final Map<int, List<Anime>> _tabData = {};
   final Map<int, bool> _tabLoading = {};
@@ -58,6 +60,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Future<void> _loadMode() async {
     final mode = await getAppMode();
     if (mounted) {
+      final newLength = mode == 'drama' ? _dramaCountries.length : 3;
+      _tabController.dispose();
+      _tabController = TabController(length: newLength, vsync: this);
+      _tabController.addListener(() {
+        if (!_tabController.indexIsChanging) _loadTab(_tabController.index);
+      });
       setState(() => _appMode = mode);
       _loadTab(0);
     }
@@ -115,18 +123,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     setState(() => _dramaTabLoading[index] = true);
     try {
       List<Drama> data;
-      switch (index) {
-        case 0:
-          data = await getPopularDramas();
-          break;
-        case 1:
-          data = await getRecentDramas();
-          break;
-        case 2:
-          data = await getNewDramas();
-          break;
-        default:
-          data = [];
+      if (index == 0) {
+        data = await getPopularDramas();
+      } else {
+        final country = _dramaCountries[index];
+        data = await getDramasByCountry(country);
       }
       if (mounted) {
         setState(() {
@@ -200,11 +201,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 hasScrollBody: true,
                 child: TabBarView(
                   controller: _tabController,
-                  children: [
-                    _buildTabContent(0),
-                    _buildTabContent(1),
-                    _buildTabContent(2),
-                  ],
+                  children: List.generate(
+                    _appMode == 'drama' ? _dramaCountries.length : 3,
+                    (i) => _buildTabContent(i),
+                  ),
                 ),
               ),
             ],
@@ -577,6 +577,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _buildTabBar() {
     final isDrama = _appMode == 'drama';
+    final dramaLabels = _dramaCountries.map((c) => c == 'All' ? L10n.t('popular') : c).toList();
+    final animeLabels = [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
+    final labels = isDrama ? dramaLabels : animeLabels;
     return Container(
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: NipahColors.lineSoft)),
@@ -597,18 +600,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         dividerColor: Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        tabs: [
-          Tab(text: isDrama ? L10n.t('popular') : L10n.t('schedule')),
-          Tab(text: isDrama ? L10n.t('recent') : L10n.t('top')),
-          Tab(text: isDrama ? L10n.t('newDramas') : L10n.t('latest')),
-        ],
+        tabs: labels.map((l) => Tab(text: l)).toList(),
       ),
     );
   }
 
   Widget _buildSectionHeader() {
     final isDrama = _appMode == 'drama';
-    final labels = isDrama ? [L10n.t('popular'), L10n.t('recent'), L10n.t('newDramas')] : [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
+    final dramaLabels = _dramaCountries.map((c) => c == 'All' ? L10n.t('popular') : c).toList();
+    final animeLabels = [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
+    final labels = isDrama ? dramaLabels : animeLabels;
     final idx = _tabController.index;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -779,18 +780,16 @@ class _DramaCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  if (drama.status.isNotEmpty)
+                  if (drama.status.isNotEmpty && drama.status.toLowerCase() != 'completed')
                     Positioned(
-                      bottom: 0,
+                      top: 0,
                       left: 0,
-                      right: 0,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        color: NipahColors.bg,
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        color: NipahColors.success,
                         child: Text(
                           drama.status,
-                          style: NipahTheme.label(size: 8, color: NipahColors.textDim),
-                          textAlign: TextAlign.center,
+                          style: NipahTheme.label(size: 8, color: NipahColors.bg),
                         ),
                       ),
                     ),

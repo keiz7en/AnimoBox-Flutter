@@ -46,6 +46,9 @@ class _WatchPageState extends State<WatchPage> {
   Duration _savedPosition = Duration.zero;
   bool _showResumeDialog = false;
   String _preferredQuality = 'Auto';
+  int _trySourceIndex = 0;
+  int _tryLinkIndex = 0;
+  bool _isRetrying = false;
 
   String get _positionKey => '${widget.anilistId}_ep${_currentEpisode}';
 
@@ -89,6 +92,20 @@ class _WatchPageState extends State<WatchPage> {
     _player.stream.completed.listen((completed) {
       if (completed && mounted) {
         clearPlaybackPosition(_positionKey);
+      }
+    });
+
+    _player.stream.error.listen((error) {
+      if (mounted && error.isNotEmpty && !_isRetrying) {
+        _isRetrying = true;
+        debugPrint('WatchPage: Player error: $error - trying next source');
+        _trySourceIndex++;
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _isRetrying = false;
+            _tryNextSource();
+          }
+        });
       }
     });
 
@@ -260,9 +277,11 @@ class _WatchPageState extends State<WatchPage> {
         return;
       }
 
+      _trySourceIndex = 0;
+      _tryLinkIndex = _selectBestLink(sources.first);
       _selectedSourceIndex = 0;
-      _selectedLinkIndex = _selectBestLink(sources.first);
-      await _initializePlayer(sources.first.links[_selectedLinkIndex].url, sources.first);
+      _selectedLinkIndex = _tryLinkIndex;
+      _tryNextSource();
     } catch (e) {
       setState(() {
         _isInitializing = false;
@@ -272,13 +291,33 @@ class _WatchPageState extends State<WatchPage> {
     }
   }
 
+  void _tryNextSource() {
+    if (_trySourceIndex >= _sources.length) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _hasError = true;
+          _errorMessage = 'All servers failed. Try again later.';
+        });
+      }
+      return;
+    }
+    final source = _sources[_trySourceIndex];
+    _tryLinkIndex = _selectBestLink(source);
+    if (_tryLinkIndex >= source.links.length) {
+      _trySourceIndex++;
+      _tryNextSource();
+      return;
+    }
+    _selectedSourceIndex = _trySourceIndex;
+    _selectedLinkIndex = _tryLinkIndex;
+    _initializePlayer(source.links[_tryLinkIndex].url, source);
+  }
+
   Future<void> _initializePlayer(String url, StreamSource source) async {
     if (url.isEmpty) {
-      setState(() {
-        _isInitializing = false;
-        _hasError = true;
-        _errorMessage = 'This source is not available.';
-      });
+      _trySourceIndex++;
+      _tryNextSource();
       return;
     }
 
@@ -307,11 +346,9 @@ class _WatchPageState extends State<WatchPage> {
       _resetHideTimer();
       _saveWatchHistory();
     } catch (e) {
-      setState(() {
-        _isInitializing = false;
-        _hasError = true;
-        _errorMessage = 'Failed to load video: $e';
-      });
+      debugPrint('WatchPage: Failed to open $url - $e');
+      _trySourceIndex++;
+      _tryNextSource();
     }
   }
 
@@ -456,7 +493,9 @@ class _WatchPageState extends State<WatchPage> {
                                       _isInitializing = true;
                                       _hasError = false;
                                     });
-                                    await _initializePlayer(link.url, source);
+                                    _trySourceIndex = sourceIndex;
+                                    _tryLinkIndex = linkIndex;
+                                    _initializePlayer(link.url, source);
                                   },
                                 ),
                               );
