@@ -263,7 +263,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           setState(() {
             _isInitializing = false;
             _hasError = true;
-            _errorMessage = 'No streaming sources found.';
+            _errorMessage = 'No working sources found. CDN servers may be offline.';
           });
         }
         return;
@@ -289,7 +289,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         setState(() {
           _isInitializing = false;
           _hasError = true;
-          _errorMessage = 'All servers failed. Try again later.';
+          _errorMessage = 'All servers unavailable. The streaming CDN may be down.';
         });
       }
       return;
@@ -464,22 +464,27 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
               child: Container(
                 color: Colors.black,
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.error_outline, color: NipahColors.danger, size: 48),
-                      const SizedBox(height: 16),
-                      Text(_errorMessage, style: NipahTheme.body(size: 14, color: NipahColors.textDim)),
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: _loadStream,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                          decoration: NipahTheme.goldButtonDecoration,
-                          child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 12, color: NipahColors.bg)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cloud_off, color: NipahColors.danger, size: 48),
+                        const SizedBox(height: 16),
+                        Text(_errorMessage, style: NipahTheme.body(size: 14, color: NipahColors.textDim), textAlign: TextAlign.center),
+                        const SizedBox(height: 8),
+                        Text('This may be a temporary CDN issue.', style: NipahTheme.body(size: 12, color: NipahColors.textDim), textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        GestureDetector(
+                          onTap: _loadStream,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                            decoration: NipahTheme.goldButtonDecoration,
+                            child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 12, color: NipahColors.bg)),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

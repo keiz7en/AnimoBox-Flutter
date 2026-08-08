@@ -14,11 +14,16 @@ Map<String, String> _headers() => {
 
 String _parseVideoUrl(String raw) {
   if (raw.isEmpty) return raw;
-  // Format can be: "url|lang|subtitleUrl" or just "url"
   final parts = raw.split('|');
   final clean = parts.first.trim();
   if (clean != raw) debugPrint('DramaAPI: Parsed URL: $clean (from: $raw)');
   return clean;
+}
+
+bool _isDeadCdn(String url) {
+  if (url.isEmpty) return true;
+  final lower = url.toLowerCase();
+  return lower.contains('dsaqtqpt.pro') || lower.contains('cloudokyo.cloud');
 }
 
 Future<List<Drama>> searchDramas(String query) async {
@@ -58,13 +63,20 @@ Future<List<Drama>> getPopularDramas() async {
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
     final seen = <int>{};
-    final dramas = <Drama>[];
+    final ongoing = <Drama>[];
+    final completed = <Drama>[];
     for (final list in results) {
       for (final d in list) {
-        if (seen.add(d.id)) dramas.add(d);
+        if (seen.add(d.id)) {
+          if (d.status.toLowerCase() == 'ongoing') {
+            ongoing.add(d);
+          } else {
+            completed.add(d);
+          }
+        }
       }
     }
-    return dramas.take(40).toList();
+    return [...ongoing, ...completed].take(40).toList();
   } catch (_) {
     return [];
   }
@@ -107,27 +119,26 @@ Future<String?> getDramaVideoUrl(int mediaId, int episodeNumber) async {
     if (res.statusCode != 200) return null;
     final data = jsonDecode(res.body);
 
-    // Try top-level episodes first (has videoUrl)
-    final topEpisodes = data['episodes'] as List?;
-    if (topEpisodes != null) {
-      for (final ep in topEpisodes) {
-        if (ep['number'] == episodeNumber) {
-          final videoUrl = ep['videoUrl'] as String?;
-          if (videoUrl != null && videoUrl.isNotEmpty) return _parseVideoUrl(videoUrl);
+    final servers = data['servers'] as List?;
+    if (servers != null) {
+      for (final server in servers) {
+        final episodes = server['episodes'] as List?;
+        if (episodes == null || episodes.isEmpty) continue;
+        for (final ep in episodes) {
+          if (ep['number'] == episodeNumber) {
+            final videoUrl = _parseVideoUrl(ep['url']?.toString() ?? '');
+            if (videoUrl.isNotEmpty && !_isDeadCdn(videoUrl)) return videoUrl;
+          }
         }
       }
     }
 
-    // Fallback to servers
-    final servers = data['servers'] as List?;
-    if (servers == null || servers.isEmpty) return null;
-    for (final server in servers) {
-      final episodes = server['episodes'] as List?;
-      if (episodes == null || episodes.isEmpty) continue;
-      for (final ep in episodes) {
+    final topEpisodes = data['episodes'] as List?;
+    if (topEpisodes != null) {
+      for (final ep in topEpisodes) {
         if (ep['number'] == episodeNumber) {
-          final videoUrl = ep['url'] as String?;
-          if (videoUrl != null && videoUrl.isNotEmpty) return _parseVideoUrl(videoUrl);
+          final videoUrl = _parseVideoUrl(ep['videoUrl']?.toString() ?? '');
+          if (videoUrl.isNotEmpty && !_isDeadCdn(videoUrl)) return videoUrl;
         }
       }
     }
@@ -145,23 +156,7 @@ Future<List<StreamSource>> getDramaStreamSources(int mediaId, int episodeNumber)
     final data = jsonDecode(res.body);
     final sources = <StreamSource>[];
 
-    // Add top-level episodes as "Auto" server
-    final topEpisodes = data['episodes'] as List?;
-    if (topEpisodes != null && topEpisodes.isNotEmpty) {
-      final links = <StreamLink>[];
-      for (final ep in topEpisodes) {
-        final videoUrl = ep['videoUrl'] as String?;
-        final epNum = ep['number'] ?? episodeNumber;
-        if (videoUrl != null && videoUrl.isNotEmpty) {
-          links.add(StreamLink(url: _parseVideoUrl(videoUrl), quality: 'Ep $epNum'));
-        }
-      }
-      if (links.isNotEmpty) {
-        sources.add(StreamSource(server: 'Auto', type: 'drama', links: links));
-      }
-    }
-
-    // Add named servers
+    // Add named servers first (they may have different CDN URLs)
     final servers = data['servers'] as List?;
     if (servers != null) {
       for (final server in servers) {
@@ -170,15 +165,32 @@ Future<List<StreamSource>> getDramaStreamSources(int mediaId, int episodeNumber)
         if (episodes == null || episodes.isEmpty) continue;
         final links = <StreamLink>[];
         for (final ep in episodes) {
-          final videoUrl = ep['url'] as String?;
+          if (ep['locked'] == true) continue;
+          final videoUrl = _parseVideoUrl(ep['url']?.toString() ?? '');
           final epNum = ep['number'] ?? episodeNumber;
-          if (videoUrl != null && videoUrl.isNotEmpty) {
-            links.add(StreamLink(url: _parseVideoUrl(videoUrl), quality: 'Ep $epNum'));
+          if (videoUrl.isNotEmpty && !_isDeadCdn(videoUrl)) {
+            links.add(StreamLink(url: videoUrl, quality: 'Ep $epNum'));
           }
         }
         if (links.isNotEmpty) {
           sources.add(StreamSource(server: name, type: 'drama', links: links));
         }
+      }
+    }
+
+    // Add top-level episodes as fallback
+    final topEpisodes = data['episodes'] as List?;
+    if (topEpisodes != null && topEpisodes.isNotEmpty) {
+      final links = <StreamLink>[];
+      for (final ep in topEpisodes) {
+        final videoUrl = _parseVideoUrl(ep['videoUrl']?.toString() ?? '');
+        final epNum = ep['number'] ?? episodeNumber;
+        if (videoUrl.isNotEmpty && !_isDeadCdn(videoUrl)) {
+          links.add(StreamLink(url: videoUrl, quality: 'Ep $epNum'));
+        }
+      }
+      if (links.isNotEmpty) {
+        sources.add(StreamSource(server: 'Auto', type: 'drama', links: links));
       }
     }
     return sources;
@@ -193,13 +205,20 @@ Future<List<Drama>> getDramasByCountry(String country) async {
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
     final seen = <int>{};
-    final dramas = <Drama>[];
+    final ongoing = <Drama>[];
+    final completed = <Drama>[];
     for (final list in results) {
       for (final d in list) {
-        if (seen.add(d.id)) dramas.add(d);
+        if (seen.add(d.id)) {
+          if (d.status.toLowerCase() == 'ongoing') {
+            ongoing.add(d);
+          } else {
+            completed.add(d);
+          }
+        }
       }
     }
-    return dramas.take(50).toList();
+    return [...ongoing, ...completed].take(50).toList();
   } catch (_) {
     return [];
   }

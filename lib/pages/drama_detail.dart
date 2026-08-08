@@ -155,21 +155,56 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
 
   Widget _buildEpisodeList() {
     final episodes = _episodeData!.episodes;
+    final useGrid = episodes.length > 30;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Episodes (${episodes.length})', style: NipahTheme.heading(size: 16)),
         const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-          ),
-          itemCount: episodes.length,
-          itemBuilder: (context, index) {
+        if (useGrid)
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 5,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+            ),
+            itemCount: episodes.length,
+            itemBuilder: (context, index) {
+              final ep = episodes[index];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DramaWatchPage(
+                        title: widget.drama.title,
+                        episode: ep.number,
+                        mediaId: widget.drama.id,
+                        episodes: episodes,
+                        coverImage: widget.drama.poster,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: NipahColors.surface2,
+                    border: Border.all(color: NipahColors.lineSoft),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${ep.number}',
+                      style: NipahTheme.heading(size: 16, color: NipahColors.gold),
+                    ),
+                  ),
+                ),
+              );
+            },
+          )
+        else
+          ...List.generate(episodes.length, (index) {
             final ep = episodes[index];
             return GestureDetector(
               onTap: () {
@@ -187,20 +222,55 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                 );
               },
               child: Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: NipahColors.surface2,
+                  color: NipahColors.surface,
                   border: Border.all(color: NipahColors.lineSoft),
                 ),
-                child: Center(
-                  child: Text(
-                    '${ep.number}',
-                    style: NipahTheme.heading(size: 16, color: NipahColors.gold),
-                  ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [NipahColors.gold, NipahColors.goldStrong],
+                        ),
+                      ),
+                      child: Icon(Icons.play_arrow, color: NipahColors.bg, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Episode ${ep.number}',
+                            style: NipahTheme.body(size: 14, weight: FontWeight.w600),
+                          ),
+                          if (ep.title.isNotEmpty)
+                            Text(
+                              ep.title,
+                              style: NipahTheme.body(size: 11, color: NipahColors.textDim),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (ep.duration.isNotEmpty)
+                      Text(
+                        ep.duration,
+                        style: NipahTheme.label(size: 10, color: NipahColors.textDim),
+                      ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.play_circle_outline, color: NipahColors.gold, size: 22),
+                  ],
                 ),
               ),
             );
-          },
-        ),
+          }),
       ],
     );
   }

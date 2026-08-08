@@ -297,7 +297,7 @@ class _WatchPageState extends State<WatchPage> {
         setState(() {
           _isInitializing = false;
           _hasError = true;
-          _errorMessage = 'All servers failed. Try again later.';
+          _errorMessage = 'All servers unavailable. Try again later.';
         });
       }
       return;
