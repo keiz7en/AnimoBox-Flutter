@@ -1,0 +1,202 @@
+LimeSugar — Custom End-User License Agreement (EULA)
+Version 1.0 | Effective: 2024
+
+============================================================
+PART 1 — GRANT & SCOPE
+============================================================
+
+1.1 License Grant
+Subject to this Agreement, LimeSugar ("Licensor") grants you ("Licensee")
+a non-exclusive, non-transferable, revocable license to:
+  (a) download, install, and use the LimeSugar application ("Software")
+      on devices you own or control;
+  (b) use the Software solely for personal, non-commercial streaming
+      of video content accessible through the Software.
+
+1.2 Restrictions
+You shall NOT:
+  (a) copy, modify, reverse engineer, decompile, disassemble,
+      or create derivative works of the Software;
+  (b) redistribute, sublicense, rent, lease, or sell the Software;
+  (c) remove or alter any copyright, trademark, or proprietary notices;
+  (d) use the Software for any illegal purpose or to infringe
+      intellectual property rights of any third party;
+  (e) automate, scrape, or bulk-download content accessed via the Software;
+  (f) share your account or access credentials with any third party.
+
+============================================================
+PART 2 — CONTENT & THIRD-PARTY SERVICES
+============================================================
+
+2.1 No Content Hosting
+The Software does NOT host, store, upload, or transmit any video content.
+It aggregates publicly available links from third-party sources.
+
+2.2 No Responsibility for Third-Party Content
+Licensor is NOT responsible for:
+  - Legality, availability, quality, or accuracy of streamed content;
+  - Copyright status of any video accessed through the Software;
+  - Changes, removal, or blocking of third-party streams;
+  - Geographic restrictions or regional licensing;
+  - Malware, viruses, or harmful code from external sources.
+
+2.3 User Assumes All Risk
+Use of third-party streams is entirely at your own risk. You are solely
+responsible for compliance with applicable laws in your jurisdiction.
+
+============================================================
+PART 3 — INTELLECTUAL PROPERTY
+============================================================
+
+3.1 Ownership
+All rights, title, and interest in the Software (including code, UI,
+branding, icons, splash animation, and documentation) remain exclusively
+with Licensor. This license grants no ownership rights.
+
+3.2 Trademarks
+"LimeSugar", the LimeSugar logo, "Nipah" theme, and all associated
+marks are trademarks of Licensor. Unauthorized use is prohibited.
+
+3.3 Third-Party Libraries
+The Software includes third-party open-source components (Flutter,
+MediaKit, CachedNetworkImage, etc.) governed by their respective licenses.
+See the "Licenses" section in the app for details.
+
+============================================================
+PART 4 — WARRANTY DISCLAIMER
+============================================================
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTY
+OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO:
+  - MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE;
+  - NON-INFRINGEMENT OF THIRD-PARTY RIGHTS;
+  - UNINTERRUPTED, TIMELY, SECURE, OR ERROR-FREE OPERATION;
+  - ACCURACY OR RELIABILITY OF CONTENT OR METADATA;
+  - COMPATIBILITY WITH ANY DEVICE, OS VERSION, OR NETWORK.
+
+============================================================
+PART 5 — LIMITATION OF LIABILITY
+============================================================
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, LICENSOR SHALL NOT BE LIABLE
+FOR ANY:
+  - INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES;
+  - LOSS OF PROFITS, DATA, REVENUE, OR BUSINESS OPPORTUNITIES;
+  - LEGAL FEES OR COSTS ARISING FROM USE OF THE SOFTWARE;
+  - CLAIMS RELATED TO THIRD-PARTY CONTENT OR SERVICES;
+  - DAMAGES EXCEEDING THE AMOUNT PAID FOR THE SOFTWARE (IF ANY).
+
+THIS LIMITATION APPLIES REGARDLESS OF LEGAL THEORY (CONTRACT, TORT,
+NEGLIGENCE, STRICT LIABILITY, OR OTHERWISE) EVEN IF LICENSOR WAS
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+============================================================
+PART 6 — INDEMNIFICATION
+============================================================
+
+You agree to indemnify, defend, and hold harmless Licensor and its
+officers, directors, employees, and agents from any claims, damages,
+losses, liabilities, costs, and expenses (including reasonable legal
+fees) arising from:
+  - Your breach of this Agreement;
+  - Your use of the Software in violation of applicable law;
+  - Your infringement of any third-party rights.
+
+============================================================
+PART 7 — TERM & TERMINATION
+============================================================
+
+7.1 Term
+This Agreement is effective upon your first use of the Software and
+continues until terminated.
+
+7.2 Termination by You
+You may terminate by uninstalling the Software and destroying all copies.
+
+7.3 Termination by Licensor
+Licensor may terminate immediately, without notice, if you breach
+any term. Upon termination, all rights cease and you must destroy
+all copies.
+
+7.4 Survival
+Parts 2, 3, 4, 5, 6, 8, and 9 survive termination.
+
+============================================================
+PART 8 — UPDATES & MODIFICATIONS
+============================================================
+
+8.1 Automatic Updates
+The Software may automatically check for and install updates from
+GitHub releases. You consent to such updates.
+
+8.2 Modification of Terms
+Licensor may modify this Agreement at any time. Continued use after
+changes constitutes acceptance. Material changes will be notified
+via the Software or GitHub releases.
+
+============================================================
+PART 9 — GENERAL PROVISIONS
+============================================================
+
+9.1 Governing Law
+This Agreement is governed by the laws of the jurisdiction where
+Licensor operates, without regard to conflict-of-law principles.
+
+9.2 Dispute Resolution
+Any dispute shall be resolved in the competent courts of Licensor's
+jurisdiction. You consent to exclusive jurisdiction and venue there.
+
+9.3 Severability
+If any provision is held unenforceable, the remainder continues
+in full force and effect.
+
+9.3 No Waiver
+Failure to enforce any right does not waive that right.
+
+9.4 Entire Agreement
+This Agreement constitutes the entire understanding between you and
+Licensor regarding the Software.
+
+9.5 Assignment
+Licensor may assign this Agreement. You may not assign without
+prior written consent.
+
+9.6 Force Majeure
+Licensor is not liable for delays caused by events beyond its
+reasonable control.
+
+9.7 Language
+This Agreement is in English. Translations are for convenience only;
+the English version prevails.
+
+============================================================
+PART 10 — THIRD-PARTY OPEN SOURCE NOTICES
+============================================================
+
+The Software includes the following major open-source components:
+
+Flutter (BSD-3-Clause) — https://github.com/flutter/flutter
+MediaKit (MIT) — https://github.com/media-kit/media-kit
+CachedNetworkImage (MIT) — https://github.com/Baseflow/flutter_cached_network_image
+Google Fonts (OFL) — https://fonts.google.com/
+SharedPreferences (BSD-3-Clause)
+PathProvider (BSD-3-Clause)
+Http (BSD-3-Clause)
+PackageInfoPlus (BSD-3-Clause)
+WakelockPlus (MIT)
+AndroidIntentPlus (MIT)
+UrlLauncher (BSD-3-Clause)
+OpenFile (MIT)
+CachedNetworkImage (MIT)
+
+Full license texts are available in the app under Settings → Licenses.
+
+============================================================
+CONTACT
+============================================================
+
+For license inquiries, contact: keizenfaysal@gmail.com
+
+============================================================
+END OF LICENSE
+============================================================
