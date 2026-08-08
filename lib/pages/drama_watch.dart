@@ -13,7 +13,7 @@ import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'settings.dart';
 
-const String _kHlsHtml = '''<!DOCTYPE html>
+const String _kHlsHtmlTop = '''<!DOCTYPE html>
 <html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>*{margin:0;padding:0}body{background:#000;overflow:hidden}video{width:100vw;height:100vh;object-fit:contain}</style>
@@ -21,16 +21,17 @@ const String _kHlsHtml = '''<!DOCTYPE html>
 <video id="v" playsinline></video>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
 <script>
-var p=document.getElementById('v'),h,ready=false;
-function init(u){
-  if(h){h.destroy();h=null}
+var p=document.getElementById('v'),h;
+var VIDEO_URL="__URL__";
+function startPlay(){
+  if(typeof Hls==='undefined'){setTimeout(startPlay,200);return}
   if(Hls.isSupported()){
     h=new Hls({maxBufferLength:30});
-    h.loadSource(u);h.attachMedia(p);
-    h.on(Hls.Events.MANIFEST_PARSED,function(){ready=true;p.play().catch(function(){})});
+    h.loadSource(VIDEO_URL);h.attachMedia(p);
+    h.on(Hls.Events.MANIFEST_PARSED,function(){p.play().catch(function(){})});
     h.on(Hls.Events.ERROR,function(e,d){if(d.fatal)msg('err')});
   }else if(p.canPlayType('application/vnd.apple.mpegurl')){
-    ready=true;p.src=u;p.play().catch(function(){});
+    p.src=VIDEO_URL;p.play().catch(function(){});
   }else{msg('err')}
 }
 function msg(m){try{FlutterBridge.postMessage(m)}catch(e){}}
@@ -39,6 +40,7 @@ p.addEventListener('playing',function(){msg('play')});
 p.addEventListener('pause',function(){msg('pause')});
 p.addEventListener('ended',function(){msg('end')});
 p.addEventListener('error',function(){msg('err')});
+startPlay();
 </script></body></html>''';
 
 class DramaWatchPage extends StatefulWidget {
@@ -447,20 +449,17 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       return;
     }
 
-    final escapedUrl = url.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\$', '\\\$');
+    final html = _kHlsHtmlTop.replaceAll('__URL__', url.replaceAll('\\', '\\\\').replaceAll("'", "\\'"));
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel('FlutterBridge', onMessageReceived: _onWebViewMessage)
       ..setNavigationDelegate(NavigationDelegate(
-        onPageFinished: (_) {
-          _webViewController?.runJavaScript('init("$escapedUrl")');
-        },
         onWebResourceError: (_) {
-          debugPrint('DramaWatch: WebView load error, switching');
+          debugPrint('DramaWatch: WebView resource error, switching');
           if (!_webViewPlaying && !_isPlaying) _switchToOtherEngine();
         },
       ))
-      ..loadHtmlString(_kHlsHtml);
+      ..loadHtmlString(html);
 
     setState(() {});
   }
