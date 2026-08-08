@@ -182,6 +182,12 @@ class Drama {
     this.createdAt = 0,
   });
 
+  bool get isHollywood {
+    final c = country.toLowerCase();
+    return c.contains('united states') || c.contains('united kingdom') ||
+        c.contains('american') || c.contains('usa') || c.contains('uk');
+  }
+
   bool get isOngoing {
     if (status.toLowerCase() == 'ongoing') return true;
     final epCount = serverEpisodesCount > 0 ? serverEpisodesCount : episodes;

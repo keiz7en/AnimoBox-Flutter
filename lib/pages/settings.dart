@@ -859,6 +859,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildContentModeCard() {
     final isAnime = _appMode == 'anime';
+    final isDrama = _appMode == 'drama';
+    final isHollywood = _appMode == 'hollywood';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -877,7 +879,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Switch between Anime and Drama content',
+            'Switch between Anime, Drama and Hollywood',
             style: NipahTheme.body(size: 12, color: NipahColors.textDim),
           ),
           const SizedBox(height: 12),
@@ -891,7 +893,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
                       gradient: isAnime ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
                       color: isAnime ? null : NipahColors.surface2,
@@ -899,15 +901,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     child: Column(
                       children: [
-                        Icon(Icons.animation, size: 28, color: isAnime ? NipahColors.bg : NipahColors.textDim),
-                        const SizedBox(height: 6),
-                        Text('Anime', style: NipahTheme.label(size: 13, color: isAnime ? NipahColors.bg : NipahColors.textDim)),
+                        Icon(Icons.animation, size: 24, color: isAnime ? NipahColors.bg : NipahColors.textDim),
+                        const SizedBox(height: 4),
+                        Text('Anime', style: NipahTheme.label(size: 11, color: isAnime ? NipahColors.bg : NipahColors.textDim)),
                       ],
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: GestureDetector(
                   onTap: () {
@@ -916,17 +918,42 @@ class _SettingsPageState extends State<SettingsPage> {
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      gradient: !isAnime ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
-                      color: !isAnime ? null : NipahColors.surface2,
-                      border: Border.all(color: !isAnime ? NipahColors.gold : NipahColors.lineSoft),
+                      gradient: isDrama ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
+                      color: isDrama ? null : NipahColors.surface2,
+                      border: Border.all(color: isDrama ? NipahColors.gold : NipahColors.lineSoft),
                     ),
                     child: Column(
                       children: [
-                        Icon(Icons.tv, size: 28, color: !isAnime ? NipahColors.bg : NipahColors.textDim),
-                        const SizedBox(height: 6),
-                        Text('Drama', style: NipahTheme.label(size: 13, color: !isAnime ? NipahColors.bg : NipahColors.textDim)),
+                        Icon(Icons.tv, size: 24, color: isDrama ? NipahColors.bg : NipahColors.textDim),
+                        const SizedBox(height: 4),
+                        Text('Drama', style: NipahTheme.label(size: 11, color: isDrama ? NipahColors.bg : NipahColors.textDim)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _appMode = 'hollywood');
+                    _save('appMode', 'hollywood');
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: isHollywood ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]) : null,
+                      color: isHollywood ? null : NipahColors.surface2,
+                      border: Border.all(color: isHollywood ? NipahColors.gold : NipahColors.lineSoft),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.movie_filter, size: 24, color: isHollywood ? NipahColors.bg : NipahColors.textDim),
+                        const SizedBox(height: 4),
+                        Text('Hollywood', style: NipahTheme.label(size: 11, color: isHollywood ? NipahColors.bg : NipahColors.textDim)),
                       ],
                     ),
                   ),

@@ -98,7 +98,7 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
       _searchPage = 1;
       _hasMoreSearch = true;
     });
-    if (_appMode == 'drama') {
+    if (_appMode == 'drama' || _appMode == 'hollywood') {
       final results = await searchDramas(query);
       if (mounted) {
         setState(() {
@@ -166,23 +166,26 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final isDramaOrHollywood = _appMode == 'drama' || _appMode == 'hollywood';
     return Scaffold(
       backgroundColor: NipahColors.bg,
       body: SafeArea(
         child: Column(
           children: [
             _buildSearchBar(),
-            _buildTabs(),
+            if (!isDramaOrHollywood) _buildTabs(),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildSearchResults(),
-                  _buildTopAnime(),
-                  _buildSchedule(),
-                  _buildGenreGrid(),
-                ],
-              ),
+              child: isDramaOrHollywood
+                  ? _buildSearchResults()
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildSearchResults(),
+                        _buildTopAnime(),
+                        _buildSchedule(),
+                        _buildGenreGrid(),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -263,7 +266,7 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
     if (_isSearching) {
       return _buildShimmerGrid();
     }
-    if (_appMode == 'drama') {
+    if (_appMode == 'drama' || _appMode == 'hollywood') {
       return _buildDramaSearchResults();
     }
     if (_searchResults.isEmpty && _searchController.text.isNotEmpty) {

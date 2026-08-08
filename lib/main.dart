@@ -329,42 +329,50 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
-  late final PageController _pageController;
+  String _appMode = 'anime';
 
-  final _pages = const [
-    HomePage(),
-    SearchPage(),
-    LibraryPage(),
-    HistoryPage(),
-    SettingsPage(),
-  ];
+  List<Widget> get _pages {
+    if (_appMode == 'anime') {
+      return const [HomePage(), SearchPage(), LibraryPage(), HistoryPage(), SettingsPage()];
+    }
+    return const [HomePage(), HistoryPage(), SettingsPage()];
+  }
 
-  final _icons = const [
-    Icons.home_outlined,
-    Icons.search,
-    Icons.library_books_outlined,
-    Icons.history_outlined,
-    Icons.settings_outlined,
-  ];
-  final _selectedIcons = const [
-    Icons.home,
-    Icons.search,
-    Icons.library_books,
-    Icons.history,
-    Icons.settings,
-  ];
-  final _labels = const ['Home', 'Search', 'Library', 'History', 'Settings'];
+  List<IconData> get _icons {
+    if (_appMode == 'anime') {
+      return const [Icons.home_outlined, Icons.search, Icons.library_books_outlined, Icons.history_outlined, Icons.settings_outlined];
+    }
+    return const [Icons.home_outlined, Icons.history_outlined, Icons.settings_outlined];
+  }
+
+  List<IconData> get _selectedIcons {
+    if (_appMode == 'anime') {
+      return const [Icons.home, Icons.search, Icons.library_books, Icons.history, Icons.settings];
+    }
+    return const [Icons.home, Icons.history, Icons.settings];
+  }
+
+  List<String> get _labels {
+    if (_appMode == 'anime') {
+      return const ['Home', 'Search', 'Library', 'History', 'Settings'];
+    }
+    return const ['Home', 'History', 'Settings'];
+  }
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
+    _loadMode();
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
+  Future<void> _loadMode() async {
+    final mode = await getAppMode();
+    if (mounted) {
+      setState(() {
+        _appMode = mode;
+        _currentIndex = 0;
+      });
+    }
   }
 
   @override
@@ -391,12 +399,20 @@ class _MainScreenState extends State<MainScreen> {
           child: SizedBox(
             height: 60,
             child: Row(
-              children: List.generate(5, (i) {
+              children: List.generate(_pages.length, (i) {
                 final isSelected = _currentIndex == i;
                 return Expanded(
                   child: GestureDetector(
-                    onTap: () {
-                      setState(() => _currentIndex = i);
+                    onTap: () async {
+                      final mode = await getAppMode();
+                      if (mode != _appMode) {
+                        setState(() {
+                          _appMode = mode;
+                          _currentIndex = 0;
+                        });
+                      } else {
+                        setState(() => _currentIndex = i);
+                      }
                     },
                     behavior: HitTestBehavior.opaque,
                     child: AnimatedContainer(

@@ -274,3 +274,87 @@ Future<List<Drama>> getAiringDramasByCountry(String country) async {
     return [];
   }
 }
+
+Future<List<Drama>> getHollywoodDramas() async {
+  try {
+    final queries = [
+      'american', 'hollywood', 'united states', 'usa',
+      'english', 'netflix', 'disney', 'hbo',
+    ];
+    final futures = queries.map((q) => searchDramas(q)).toList();
+    final results = await Future.wait(futures);
+    final seen = <int>{};
+    final dramas = <Drama>[];
+    for (final list in results) {
+      for (final d in list) {
+        if (seen.add(d.id) && d.isHollywood) dramas.add(d);
+      }
+    }
+    dramas.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return dramas.take(50).toList();
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<List<Drama>> getPopularHollywood() async {
+  try {
+    final queries = ['american', 'hollywood', 'usa', 'netflix', 'english movie'];
+    final futures = queries.map((q) => searchDramas(q)).toList();
+    final results = await Future.wait(futures);
+    final seen = <int>{};
+    final ongoing = <Drama>[];
+    final completed = <Drama>[];
+    for (final list in results) {
+      for (final d in list) {
+        if (seen.add(d.id) && d.isHollywood) {
+          if (d.isOngoing) {
+            ongoing.add(d);
+          } else {
+            completed.add(d);
+          }
+        }
+      }
+    }
+    return [...ongoing, ...completed].take(40).toList();
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<List<Drama>> getNewHollywood() async {
+  try {
+    final queries = ['hollywood 2026', 'hollywood 2025', 'american new', 'usa new'];
+    final futures = queries.map((q) => searchDramas(q)).toList();
+    final results = await Future.wait(futures);
+    final seen = <int>{};
+    final dramas = <Drama>[];
+    for (final list in results) {
+      for (final d in list) {
+        if (seen.add(d.id) && d.isHollywood) dramas.add(d);
+      }
+    }
+    dramas.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return dramas.take(40).toList();
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<List<Drama>> getAiringHollywood() async {
+  try {
+    final queries = ['american ongoing', 'hollywood ongoing', 'usa ongoing'];
+    final futures = queries.map((q) => searchDramas(q)).toList();
+    final results = await Future.wait(futures);
+    final seen = <int>{};
+    final dramas = <Drama>[];
+    for (final list in results) {
+      for (final d in list) {
+        if (seen.add(d.id) && d.isHollywood && d.isOngoing) dramas.add(d);
+      }
+    }
+    return dramas.take(30).toList();
+  } catch (_) {
+    return [];
+  }
+}

@@ -22,6 +22,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   String _appMode = 'anime';
 
   static const _dramaCountries = ['All', 'Japanese', 'Korean', 'Chinese', 'Thai', 'Filipino', 'English'];
+  static const _hollywoodTabs = ['All', 'New', 'Popular', 'Airing'];
 
   // Anime data
   final Map<int, List<Anime>> _tabData = {};
@@ -37,6 +38,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   final Map<int, List<Drama>> _dramaTabData = {};
   final Map<int, bool> _dramaTabLoading = {};
   final Map<int, bool> _dramaTabLoaded = {};
+
+  // Hollywood data
+  List<Drama> _heroHollywood = [];
+  final Map<int, List<Drama>> _hollywoodTabData = {};
+  final Map<int, bool> _hollywoodTabLoading = {};
+  final Map<int, bool> _hollywoodTabLoaded = {};
 
   @override
   void initState() {
@@ -60,7 +67,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Future<void> _loadMode() async {
     final mode = await getAppMode();
     if (mounted) {
-      final newLength = mode == 'drama' ? _dramaCountries.length : 3;
+      final newLength = mode == 'drama' ? _dramaCountries.length : mode == 'hollywood' ? _hollywoodTabs.length : 3;
       _tabController.dispose();
       _tabController = TabController(length: newLength, vsync: this);
       _tabController.addListener(() {
@@ -74,6 +81,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Future<void> _loadTab(int index) async {
     if (_appMode == 'drama') {
       await _loadDramaTab(index);
+    } else if (_appMode == 'hollywood') {
+      await _loadHollywoodTab(index);
     } else {
       await _loadAnimeTab(index);
     }
@@ -150,18 +159,68 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
+  Future<void> _loadHollywoodTab(int index) async {
+    if (_hollywoodTabLoaded[index] == true) return;
+    setState(() => _hollywoodTabLoading[index] = true);
+    try {
+      List<Drama> data;
+      switch (index) {
+        case 0:
+          data = await getHollywoodDramas();
+          break;
+        case 1:
+          data = await getNewHollywood();
+          break;
+        case 2:
+          data = await getPopularHollywood();
+          break;
+        case 3:
+          data = await getAiringHollywood();
+          break;
+        default:
+          data = [];
+      }
+      if (mounted) {
+        setState(() {
+          _hollywoodTabData[index] = data;
+          _hollywoodTabLoading[index] = false;
+          _hollywoodTabLoaded[index] = true;
+          if (index == 0 && data.isNotEmpty && _heroHollywood.isEmpty) {
+            _heroHollywood = data.take(15).toList();
+            _startHeroTimer();
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hollywoodTabLoading[index] = false;
+          _hollywoodTabLoaded[index] = true;
+        });
+      }
+    }
+  }
+
   void _startHeroTimer() {
     _heroTimer?.cancel();
     _heroTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (mounted) {
-        final heroList = _appMode == 'drama' ? _heroDramas : _heroAnime;
+        List<Drama> heroList;
+        if (_appMode == 'drama') {
+          heroList = _heroDramas;
+        } else if (_appMode == 'hollywood') {
+          heroList = _heroHollywood;
+        } else {
+          final animeList = _heroAnime;
+          if (animeList.isNotEmpty) {
+            final next = (_heroIndex + 1) % animeList.length;
+            _heroPageController.animateToPage(next, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+          }
+          return;
+        }
         if (heroList.isNotEmpty) {
           final next = (_heroIndex + 1) % heroList.length;
-          _heroPageController.animateToPage(
-            next,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOut,
-          );
+          _heroPageController.animateToPage(next, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
         }
       }
     });
@@ -174,8 +233,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Future<void> _onRefresh() async {
     _tabLoaded.clear();
     _dramaTabLoaded.clear();
+    _hollywoodTabLoaded.clear();
     _heroAnime = [];
     _heroDramas = [];
+    _heroHollywood = [];
     _heroIndex = 0;
     await _loadTab(_tabController.index);
   }
@@ -202,7 +263,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 child: TabBarView(
                   controller: _tabController,
                   children: List.generate(
-                    _appMode == 'drama' ? _dramaCountries.length : 3,
+                    _appMode == 'drama' ? _dramaCountries.length : _appMode == 'hollywood' ? _hollywoodTabs.length : 3,
                     (i) => _buildTabContent(i),
                   ),
                 ),
@@ -215,7 +276,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildHeroSection() {
-    final heroList = _appMode == 'drama' ? _heroDramas : _heroAnime;
+    List<Drama> heroList;
+    if (_appMode == 'drama') {
+      heroList = _heroDramas;
+    } else if (_appMode == 'hollywood') {
+      heroList = _heroHollywood;
+    } else {
+      if (_heroAnime.isEmpty) return const SizedBox.shrink();
+      return SizedBox(
+        height: 420,
+        width: double.infinity,
+        child: PageView.builder(
+          controller: _heroPageController,
+          itemCount: _heroAnime.length,
+          onPageChanged: _onHeroPageChanged,
+          itemBuilder: (context, index) => _buildHeroItem(_heroAnime[index]),
+        ),
+      );
+    }
     if (heroList.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
@@ -225,12 +303,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         controller: _heroPageController,
         itemCount: heroList.length,
         onPageChanged: _onHeroPageChanged,
-        itemBuilder: (context, index) {
-          if (_appMode == 'drama') {
-            return _buildDramaHeroItem(_heroDramas[index]);
-          }
-          return _buildHeroItem(_heroAnime[index]);
-        },
+        itemBuilder: (context, index) => _buildDramaHeroItem(heroList[index]),
       ),
     );
   }
@@ -552,12 +625,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ],
               ),
             ),
-            if (_heroDramas.length > 1)
+            if (_appMode == 'hollywood' ? _heroHollywood.length > 1 : _heroDramas.length > 1)
               Positioned(
                 left: 16,
                 bottom: 28,
                 child: Row(
-                  children: List.generate(_heroDramas.length, (i) {
+                  children: List.generate(
+                    _appMode == 'hollywood' ? _heroHollywood.length : _heroDramas.length,
+                    (i) {
                     return Container(
                       width: i == _heroIndex ? 24 : 12,
                       height: 4,
@@ -577,9 +652,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _buildTabBar() {
     final isDrama = _appMode == 'drama';
+    final isHollywood = _appMode == 'hollywood';
     final dramaLabels = _dramaCountries.map((c) => c == 'All' ? L10n.t('popular') : c).toList();
+    final hollywoodLabels = ['All', 'New', 'Popular', 'Airing'];
     final animeLabels = [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
-    final labels = isDrama ? dramaLabels : animeLabels;
+    final labels = isDrama ? dramaLabels : isHollywood ? hollywoodLabels : animeLabels;
     return Container(
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: NipahColors.lineSoft)),
@@ -607,9 +684,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Widget _buildSectionHeader() {
     final isDrama = _appMode == 'drama';
+    final isHollywood = _appMode == 'hollywood';
     final dramaLabels = _dramaCountries.map((c) => c == 'All' ? L10n.t('popular') : c).toList();
+    final hollywoodLabels = ['All', 'New', 'Popular', 'Airing'];
     final animeLabels = [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
-    final labels = isDrama ? dramaLabels : animeLabels;
+    final labels = isDrama ? dramaLabels : isHollywood ? hollywoodLabels : animeLabels;
     final idx = _tabController.index;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -627,6 +706,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Widget _buildTabContent(int index) {
     if (_appMode == 'drama') {
       return _buildDramaTabContent(index);
+    }
+    if (_appMode == 'hollywood') {
+      return _buildHollywoodTabContent(index);
     }
     return _buildAnimeTabContent(index);
   }
@@ -695,6 +777,48 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             GestureDetector(
               onTap: () {
                 setState(() => _dramaTabLoaded[index] = false);
+                _loadTab(index);
+              },
+              child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 12)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.6,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemCount: data.length,
+      itemBuilder: (context, index2) {
+        return _DramaCard(drama: data[index2]);
+      },
+    );
+  }
+
+  Widget _buildHollywoodTabContent(int index) {
+    final isLoading = _hollywoodTabLoading[index] ?? true;
+    final data = _hollywoodTabData[index] ?? [];
+
+    if (isLoading) return _buildShimmerGrid();
+
+    if (data.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.movie_filter, size: 56, color: NipahColors.textDim),
+            const SizedBox(height: 12),
+            Text('No Hollywood content found', style: NipahTheme.body(size: 15, color: NipahColors.textDim)),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () {
+                setState(() => _hollywoodTabLoaded[index] = false);
                 _loadTab(index);
               },
               child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 12)),
