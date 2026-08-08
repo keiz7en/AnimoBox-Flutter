@@ -29,3 +29,8 @@ Thumbs.db
 # APK output (release only)
 *.apk
 *.aab
+
+# Manim cache
+media/
+__pycache__/
+*.pyc
