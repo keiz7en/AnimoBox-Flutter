@@ -316,6 +316,28 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         headers['Referer'] = 'https://kissasian.dev/';
       }
       await _player.open(Media(url, httpHeaders: headers));
+
+      if (_showResumeDialog) {
+        await _player.pause();
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isPlaying = false;
+            _showControls = true;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isPlaying = true;
+            _showControls = true;
+          });
+        }
+        _startPositionSaveTimer();
+      }
+      _resetHideTimer();
+      _saveWatchHistory();
     } catch (e) {
       debugPrint('DramaWatch: Failed to open $url - $e');
       _trySourceIndex++;
