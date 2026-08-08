@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../api.dart';
 import '../drama_api.dart';
@@ -55,6 +56,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   int _trySourceIndex = 0;
   int _tryLinkIndex = 0;
   bool _isRetrying = false;
+  String _lastFailedUrl = '';
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
@@ -283,9 +285,15 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   void _tryNextSource() {
     if (_trySourceIndex >= _sources.length) {
       if (mounted) {
+        final lastUrl = _sources.isNotEmpty &&
+            _tryLinkIndex >= 0 &&
+            _tryLinkIndex < _sources.last.links.length
+            ? _sources.last.links[_tryLinkIndex].url
+            : '';
         setState(() {
           _isInitializing = false;
           _hasError = true;
+          _lastFailedUrl = lastUrl;
           _errorMessage = 'All servers unavailable. The streaming CDN may be down.';
         });
       }
@@ -367,6 +375,19 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _saveCurrentPosition();
     setState(() => _currentEpisode = newEp);
     _loadStream();
+  }
+
+  Future<void> _openInExternalPlayer() async {
+    if (_lastFailedUrl.isEmpty) return;
+    final vlcUri = Uri.parse('vlc://${_lastFailedUrl}');
+    if (await canLaunchUrl(vlcUri)) {
+      await launchUrl(vlcUri);
+    } else {
+      final genericUri = Uri.parse(_lastFailedUrl);
+      if (await canLaunchUrl(genericUri)) {
+        await launchUrl(genericUri, mode: LaunchMode.externalApplication);
+      }
+    }
   }
 
   void _switchServer(int sourceIndex) {
@@ -451,13 +472,32 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                         Icon(Icons.cloud_off, color: NipahColors.danger, size: 48),
                         const SizedBox(height: 16),
                         Text(_errorMessage, style: NipahTheme.body(size: 14, color: NipahColors.textDim), textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
+                        if (_lastFailedUrl.isNotEmpty)
+                          GestureDetector(
+                            onTap: _openInExternalPlayer,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              decoration: NipahTheme.goldButtonDecoration,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.open_in_new, color: NipahColors.bg, size: 16),
+                                  const SizedBox(width: 8),
+                                  Text('Open in VLC', style: NipahTheme.label(size: 12, color: NipahColors.bg)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        if (_lastFailedUrl.isNotEmpty) const SizedBox(height: 12),
                         GestureDetector(
                           onTap: _loadStream,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                            decoration: NipahTheme.goldButtonDecoration,
-                            child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 12, color: NipahColors.bg)),
+                            decoration: BoxDecoration(border: Border.all(color: NipahColors.lineSoft)),
+                            child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 12, color: NipahColors.textDim)),
                           ),
                         ),
                       ],

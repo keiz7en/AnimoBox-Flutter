@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../api.dart';
 import '../models.dart';
@@ -49,6 +50,7 @@ class _WatchPageState extends State<WatchPage> {
   int _trySourceIndex = 0;
   int _tryLinkIndex = 0;
   bool _isRetrying = false;
+  String _lastFailedUrl = '';
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -304,9 +306,15 @@ class _WatchPageState extends State<WatchPage> {
   void _tryNextSource() {
     if (_trySourceIndex >= _sources.length) {
       if (mounted) {
+        final lastUrl = _sources.isNotEmpty &&
+            _tryLinkIndex >= 0 &&
+            _tryLinkIndex < _sources.last.links.length
+            ? _sources.last.links[_tryLinkIndex].url
+            : '';
         setState(() {
           _isInitializing = false;
           _hasError = true;
+          _lastFailedUrl = lastUrl;
           _errorMessage = 'All servers unavailable. Try again later.';
         });
       }
@@ -544,6 +552,19 @@ class _WatchPageState extends State<WatchPage> {
     _loadStream();
   }
 
+  Future<void> _openInExternalPlayer() async {
+    if (_lastFailedUrl.isEmpty) return;
+    final vlcUri = Uri.parse('vlc://${_lastFailedUrl}');
+    if (await canLaunchUrl(vlcUri)) {
+      await launchUrl(vlcUri);
+    } else {
+      final genericUri = Uri.parse(_lastFailedUrl);
+      if (await canLaunchUrl(genericUri)) {
+        await launchUrl(genericUri, mode: LaunchMode.externalApplication);
+      }
+    }
+  }
+
   int _selectBestLink(StreamSource source) {
     if (source.links.isEmpty) return 0;
     if (_preferredQuality == 'Auto') return 0;
@@ -691,17 +712,34 @@ class _WatchPageState extends State<WatchPage> {
               style: NipahTheme.body(size: 12, color: NipahColors.textDim),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            if (_lastFailedUrl.isNotEmpty)
+              GestureDetector(
+                onTap: _openInExternalPlayer,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: NipahTheme.goldButtonDecoration,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.open_in_new, color: NipahColors.bg, size: 16),
+                      const SizedBox(width: 8),
+                      Text('Open in VLC', style: NipahTheme.label(size: 11, color: NipahColors.bg)),
+                    ],
+                  ),
+                ),
+              ),
+            if (_lastFailedUrl.isNotEmpty) const SizedBox(height: 12),
             GestureDetector(
               onTap: _loadStream,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [NipahColors.gold, NipahColors.goldStrong],
-                  ),
+                  border: Border.all(color: NipahColors.lineSoft),
                 ),
-                child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 11, color: NipahColors.bg)),
+                child: Text(L10n.t('retryAll'), style: NipahTheme.label(size: 11, color: NipahColors.textDim)),
               ),
             ),
           ],
