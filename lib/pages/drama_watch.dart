@@ -1,15 +1,45 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../api.dart';
 import '../drama_api.dart';
 import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'settings.dart';
+
+const String _kHlsHtml = '''<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>*{margin:0;padding:0}body{background:#000;overflow:hidden}video{width:100vw;height:100vh;object-fit:contain}</style>
+</head><body>
+<video id="v" playsinline></video>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+<script>
+var p=document.getElementById('v'),h,ready=false;
+function init(u){
+  if(h){h.destroy();h=null}
+  if(Hls.isSupported()){
+    h=new Hls({maxBufferLength:30});
+    h.loadSource(u);h.attachMedia(p);
+    h.on(Hls.Events.MANIFEST_PARSED,function(){ready=true;p.play().catch(function(){})});
+    h.on(Hls.Events.ERROR,function(e,d){if(d.fatal)msg('err')});
+  }else if(p.canPlayType('application/vnd.apple.mpegurl')){
+    ready=true;p.src=u;p.play().catch(function(){});
+  }else{msg('err')}
+}
+function msg(m){try{FlutterBridge.postMessage(m)}catch(e){}}
+p.addEventListener('timeupdate',function(){msg('t:'+p.currentTime+':'+p.duration)});
+p.addEventListener('playing',function(){msg('play')});
+p.addEventListener('pause',function(){msg('pause')});
+p.addEventListener('ended',function(){msg('end')});
+p.addEventListener('error',function(){msg('err')});
+</script></body></html>''';
 
 class DramaWatchPage extends StatefulWidget {
   final String title;
@@ -34,6 +64,7 @@ class DramaWatchPage extends StatefulWidget {
 class _DramaWatchPageState extends State<DramaWatchPage> {
   late final Player _player;
   late final VideoController _videoController;
+
   bool _isInitializing = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -51,6 +82,16 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   List<StreamSource> _sources = [];
   int _selectedSourceIndex = 0;
   int _selectedLinkIndex = 0;
+  int _trySourceIndex = 0;
+  int _tryLinkIndex = 0;
+  bool _isRetrying = false;
+
+  bool _useWebView = true;
+  WebViewController? _webViewController;
+  bool _webViewPlaying = false;
+  Timer? _switchTimer;
+  int _switchSeconds = 30;
+  String _playerEngineLabel = 'WebView';
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
@@ -67,7 +108,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _player.stream.playing.listen((playing) {
       if (mounted) setState(() => _isPlaying = playing);
     });
-
     _player.stream.position.listen((position) {
       if (mounted) {
         setState(() => _position = position);
@@ -75,28 +115,21 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           _lastSavedPosition = position;
           if (position.inSeconds % 5 == 0) {
             final dur = _player.state.duration;
-            if (dur.inSeconds > 5) {
-              savePlaybackPosition(_positionKey, position, dur);
-            }
+            if (dur.inSeconds > 5) savePlaybackPosition(_positionKey, position, dur);
           }
         }
       }
     });
-
-    _player.stream.duration.listen((duration) {
-      if (mounted) setState(() => _duration = duration);
+    _player.stream.duration.listen((d) {
+      if (mounted) setState(() => _duration = d);
     });
-
-    _player.stream.completed.listen((completed) {
-      if (completed && mounted) {
-        clearPlaybackPosition(_positionKey);
-      }
+    _player.stream.completed.listen((c) {
+      if (c && mounted) clearPlaybackPosition(_positionKey);
     });
-
     _player.stream.error.listen((error) {
       if (mounted && error.isNotEmpty && !_isRetrying) {
         _isRetrying = true;
-        debugPrint('DramaWatch: Player error: $error - trying next source');
+        debugPrint('DramaWatch: MediaKit error: $error');
         _trySourceIndex++;
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
@@ -132,6 +165,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   void dispose() {
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
+    _switchTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
     WakelockPlus.disable();
@@ -179,25 +213,38 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     final target = _savedPosition;
     _savedPosition = Duration.zero;
     _startPositionSaveTimer();
-    _player.play();
-    if (target.inSeconds > 0) {
-      StreamSubscription? sub;
-      sub = _player.stream.position.listen((_) {
-        if (mounted) {
-          _player.seek(target);
-          sub?.cancel();
-        }
-      });
-      Future.delayed(const Duration(seconds: 10), () {
-        if (mounted) sub?.cancel();
-      });
+    if (_useWebView) {
+      _webViewController?.runJavaScript('jsplay()');
+      if (target.inSeconds > 0) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _webViewController?.runJavaScript('jsseek(${target.inSeconds})');
+        });
+      }
+    } else {
+      _player.play();
+      if (target.inSeconds > 0) {
+        StreamSubscription? sub;
+        sub = _player.stream.position.listen((_) {
+          if (mounted) {
+            _player.seek(target);
+            sub?.cancel();
+          }
+        });
+        Future.delayed(const Duration(seconds: 10), () {
+          if (mounted) sub?.cancel();
+        });
+      }
     }
   }
 
   void _startFromBeginning() {
     clearPlaybackPosition(_positionKey);
     setState(() => _showResumeDialog = false);
-    _player.play();
+    if (_useWebView) {
+      _webViewController?.runJavaScript('jsplay()');
+    } else {
+      _player.play();
+    }
     _startPositionSaveTimer();
   }
 
@@ -221,18 +268,32 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   }
 
   void _togglePlayPause() {
-    _player.playOrPause();
+    if (_useWebView) {
+      _webViewController?.runJavaScript(_isPlaying ? 'jspause()' : 'jsplay()');
+    } else {
+      _player.playOrPause();
+    }
     _showControlsBriefly();
   }
 
   void _seekForward() {
-    _player.seek(_position + const Duration(seconds: 10));
+    final newPos = _position + const Duration(seconds: 10);
+    if (_useWebView) {
+      _webViewController?.runJavaScript('jsseek(${newPos.inSeconds})');
+    } else {
+      _player.seek(newPos);
+    }
     _showControlsBriefly();
   }
 
   void _seekBackward() {
     final newPos = _position - const Duration(seconds: 10);
-    _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
+    final safe = newPos < Duration.zero ? Duration.zero : newPos;
+    if (_useWebView) {
+      _webViewController?.runJavaScript('jsseek(${safe.inSeconds})');
+    } else {
+      _player.seek(safe);
+    }
     _showControlsBriefly();
   }
 
@@ -243,15 +304,95 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     return 0;
   }
 
-  int _trySourceIndex = 0;
-  int _tryLinkIndex = 0;
-  bool _isRetrying = false;
+  void _startSwitchTimer() {
+    _switchTimer?.cancel();
+    _switchSeconds = 30;
+    _switchTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      if (_isPlaying || _webViewPlaying) {
+        timer.cancel();
+        return;
+      }
+      if (_switchSeconds > 0) {
+        setState(() => _switchSeconds--);
+      } else {
+        timer.cancel();
+        _switchToOtherEngine();
+      }
+    });
+  }
+
+  void _switchToOtherEngine() {
+    _switchTimer?.cancel();
+    if (_useWebView) {
+      _useWebView = false;
+      _playerEngineLabel = 'MediaKit';
+      _switchSeconds = 30;
+      setState(() {});
+      _trySourceIndex = 0;
+      _tryNextSource();
+      _startSwitchTimer();
+    } else {
+      _useWebView = true;
+      _playerEngineLabel = 'WebView';
+      _switchSeconds = 30;
+      setState(() {});
+      _tryWebViewSource();
+      _startSwitchTimer();
+    }
+  }
+
+  void _onWebViewMessage(JavaScriptMessage message) {
+    final msg = message.message;
+    if (!mounted) return;
+    if (msg == 'play') {
+      _webViewPlaying = true;
+      _switchTimer?.cancel();
+      setState(() {
+        _isPlaying = true;
+        _isInitializing = false;
+        _showControls = true;
+      });
+      _startPositionSaveTimer();
+      _resetHideTimer();
+      _saveWatchHistory();
+    } else if (msg == 'pause') {
+      setState(() => _isPlaying = false);
+    } else if (msg == 'end') {
+      clearPlaybackPosition(_positionKey);
+    } else if (msg == 'err') {
+      debugPrint('DramaWatch: WebView HLS error');
+      if (!_webViewPlaying && !_isPlaying) {
+        _switchToOtherEngine();
+      }
+    } else if (msg.startsWith('t:')) {
+      final parts = msg.substring(2).split(':');
+      if (parts.length == 2) {
+        final pos = double.tryParse(parts[0]) ?? 0;
+        final dur = double.tryParse(parts[1]) ?? 0;
+        setState(() {
+          _position = Duration(milliseconds: (pos * 1000).toInt());
+          _duration = Duration(milliseconds: (dur * 1000).toInt());
+        });
+        if (_isPlaying && pos > 2) {
+          _lastSavedPosition = _position;
+          if (pos.toInt() % 5 == 0 && dur > 5) {
+            savePlaybackPosition(_positionKey, _position, _duration);
+          }
+        }
+      }
+    }
+  }
 
   Future<void> _loadStream() async {
     setState(() {
       _isInitializing = true;
       _hasError = false;
       _historySaved = false;
+      _webViewPlaying = false;
+      _useWebView = true;
+      _playerEngineLabel = 'WebView';
+      _switchSeconds = 30;
     });
 
     try {
@@ -263,7 +404,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           setState(() {
             _isInitializing = false;
             _hasError = true;
-            _errorMessage = 'No working sources found. CDN servers may be offline.';
+            _errorMessage = 'No sources found. CDN servers may be offline.';
           });
         }
         return;
@@ -271,7 +412,11 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
 
       _trySourceIndex = 0;
       _tryLinkIndex = _findEpisodeLink(sources.first);
-      _tryNextSource();
+      _selectedSourceIndex = 0;
+      _selectedLinkIndex = _tryLinkIndex;
+
+      _tryWebViewSource();
+      _startSwitchTimer();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -281,6 +426,43 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         });
       }
     }
+  }
+
+  Future<void> _tryWebViewSource() async {
+    if (_trySourceIndex >= _sources.length) {
+      _switchToOtherEngine();
+      return;
+    }
+    final source = _sources[_trySourceIndex];
+    _tryLinkIndex = _findEpisodeLink(source);
+    if (_tryLinkIndex >= source.links.length) {
+      _trySourceIndex++;
+      _tryWebViewSource();
+      return;
+    }
+    final url = source.links[_tryLinkIndex].url;
+    if (url.isEmpty) {
+      _trySourceIndex++;
+      _tryWebViewSource();
+      return;
+    }
+
+    final escapedUrl = url.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\$', '\\\$');
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel('FlutterBridge', onMessageReceived: _onWebViewMessage)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageFinished: (_) {
+          _webViewController?.runJavaScript('init("$escapedUrl")');
+        },
+        onWebResourceError: (_) {
+          debugPrint('DramaWatch: WebView load error, switching');
+          if (!_webViewPlaying && !_isPlaying) _switchToOtherEngine();
+        },
+      ))
+      ..loadHtmlString(_kHlsHtml);
+
+    setState(() {});
   }
 
   void _tryNextSource() {
@@ -303,10 +485,15 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     }
     _selectedSourceIndex = _trySourceIndex;
     _selectedLinkIndex = _tryLinkIndex;
-    _initializePlayerWithRetry(source.links[_tryLinkIndex].url);
+    _initializeMediaKit(source.links[_tryLinkIndex].url);
   }
 
-  Future<void> _initializePlayerWithRetry(String url) async {
+  Future<void> _initializeMediaKit(String url) async {
+    if (url.isEmpty) {
+      _trySourceIndex++;
+      _tryNextSource();
+      return;
+    }
     try {
       await _player.stop();
       final headers = <String, String>{
@@ -336,58 +523,13 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         }
         _startPositionSaveTimer();
       }
+      _switchTimer?.cancel();
       _resetHideTimer();
       _saveWatchHistory();
     } catch (e) {
-      debugPrint('DramaWatch: Failed to open $url - $e');
+      debugPrint('DramaWatch: MediaKit failed $url - $e');
       _trySourceIndex++;
       _tryNextSource();
-    }
-  }
-
-  Future<void> _initializePlayer(String url) async {
-    try {
-      await _player.stop();
-      debugPrint('DramaWatch: Playing URL: $url');
-      final headers = <String, String>{
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      };
-      if (url.contains('.m3u8')) {
-        headers['Referer'] = 'https://kissasian.dev/';
-      }
-      await _player.open(
-        Media(url, httpHeaders: headers),
-      );
-
-      if (_showResumeDialog) {
-        await _player.pause();
-        if (mounted) {
-          setState(() {
-            _isInitializing = false;
-            _isPlaying = false;
-            _showControls = true;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _isInitializing = false;
-            _isPlaying = true;
-            _showControls = true;
-          });
-        }
-        _startPositionSaveTimer();
-      }
-      _resetHideTimer();
-      _saveWatchHistory();
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _hasError = true;
-          _errorMessage = 'Failed to load video: $e';
-        });
-      }
     }
   }
 
@@ -417,7 +559,13 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     if (sourceIndex < 0 || sourceIndex >= _sources.length) return;
     _selectedSourceIndex = sourceIndex;
     _selectedLinkIndex = _findEpisodeLink(_sources[sourceIndex]);
-    _initializePlayer(_sources[sourceIndex].links[_selectedLinkIndex].url);
+    final url = _sources[sourceIndex].links[_selectedLinkIndex].url;
+    if (_useWebView) {
+      final escapedUrl = url.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\$', '\\\$');
+      _webViewController?.runJavaScript('init("$escapedUrl")');
+    } else {
+      _initializeMediaKit(url);
+    }
   }
 
   void _showServerSelector() {
@@ -433,15 +581,8 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 32, height: 4,
-                decoration: BoxDecoration(color: NipahColors.textDim, borderRadius: BorderRadius.circular(2)),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(L10n.t('selectServer'), style: NipahTheme.heading(size: 16)),
-              ),
+              Container(margin: const EdgeInsets.only(top: 8), width: 32, height: 4, decoration: BoxDecoration(color: NipahColors.textDim, borderRadius: BorderRadius.circular(2))),
+              Padding(padding: const EdgeInsets.all(16), child: Text(L10n.t('selectServer'), style: NipahTheme.heading(size: 16))),
               ...List.generate(_sources.length, (i) {
                 final s = _sources[i];
                 final isSelected = i == _selectedSourceIndex;
@@ -465,22 +606,40 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _toggleControls,
-              child: Video(
-                controller: _videoController,
-                controls: NoVideoControls,
+          if (_useWebView && _webViewController != null)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _toggleControls,
+                child: WebViewWidget(controller: _webViewController!),
+              ),
+            )
+          else if (!_useWebView)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _toggleControls,
+                child: Video(controller: _videoController, controls: NoVideoControls),
               ),
             ),
-          ),
+
           if (_isInitializing)
             Positioned.fill(
               child: Container(
                 color: Colors.black,
-                child: const Center(child: NipahLoader(size: 28)),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const NipahLoader(size: 28),
+                      const SizedBox(height: 16),
+                      Text('Trying $_playerEngineLabel...', style: NipahTheme.body(size: 13, color: NipahColors.textSoft)),
+                      const SizedBox(height: 8),
+                      Text('Switching in ${_switchSeconds}s', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
+                    ],
+                  ),
+                ),
               ),
             ),
+
           if (_hasError)
             Positioned.fill(
               child: Container(
@@ -494,8 +653,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                         Icon(Icons.cloud_off, color: NipahColors.danger, size: 48),
                         const SizedBox(height: 16),
                         Text(_errorMessage, style: NipahTheme.body(size: 14, color: NipahColors.textDim), textAlign: TextAlign.center),
-                        const SizedBox(height: 8),
-                        Text('This may be a temporary CDN issue.', style: NipahTheme.body(size: 12, color: NipahColors.textDim), textAlign: TextAlign.center),
                         const SizedBox(height: 16),
                         GestureDetector(
                           onTap: _loadStream,
@@ -511,15 +668,14 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                 ),
               ),
             ),
+
           if (_showResumeDialog) _buildResumeDialog(),
+
           if (!_isInitializing && !_hasError && !_showResumeDialog)
             AnimatedOpacity(
               opacity: _showControls ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 250),
-              child: IgnorePointer(
-                ignoring: !_showControls,
-                child: _buildOverlayControls(),
-              ),
+              child: IgnorePointer(ignoring: !_showControls, child: _buildOverlayControls()),
             ),
         ],
       ),
@@ -532,17 +688,13 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     final m = (pos.inMinutes.remainder(60)).toString().padLeft(2, '0');
     final s = (pos.inSeconds.remainder(60)).toString().padLeft(2, '0');
     final timeStr = h > 0 ? '$h:$m:$s' : '$m:$s';
-
     return Container(
       color: Colors.black87,
       child: Center(
         child: Container(
           margin: const EdgeInsets.all(32),
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: NipahColors.surface,
-            border: Border.all(color: NipahColors.lineSoft),
-          ),
+          decoration: BoxDecoration(color: NipahColors.surface, border: Border.all(color: NipahColors.lineSoft)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -550,10 +702,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
               const SizedBox(height: 16),
               Text('${L10n.t('resumeFrom')} $timeStr?', style: NipahTheme.heading(size: 20)),
               const SizedBox(height: 8),
-              Text(
-                'Episode $_currentEpisode',
-                style: NipahTheme.body(size: 13, color: NipahColors.textDim),
-              ),
+              Text('Episode $_currentEpisode', style: NipahTheme.body(size: 13, color: NipahColors.textDim)),
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -562,10 +711,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                     onTap: _startFromBeginning,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: NipahColors.lineSoft),
-                        color: NipahColors.surface2,
-                      ),
+                      decoration: BoxDecoration(border: Border.all(color: NipahColors.lineSoft), color: NipahColors.surface2),
                       child: Text(L10n.t('startOver'), style: NipahTheme.label(size: 11, color: NipahColors.textDim)),
                     ),
                   ),
@@ -574,11 +720,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                     onTap: _resumeFromPosition,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [NipahColors.gold, NipahColors.goldStrong],
-                        ),
-                      ),
+                      decoration: BoxDecoration(gradient: LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong])),
                       child: Text(L10n.t('resume'), style: NipahTheme.label(size: 11, color: NipahColors.bg)),
                     ),
                   ),
@@ -595,28 +737,18 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     return Stack(
       children: [
         Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
+          top: 0, left: 0, right: 0,
           child: Container(
             padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 8, 16, 16),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xc8000000), Colors.transparent],
-              ),
-            ),
+            decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xc8000000), Colors.transparent])),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Icon(Icons.arrow_back, color: NipahColors.text, size: 24),
-                ),
+                GestureDetector(onTap: () => Navigator.pop(context), child: Icon(Icons.arrow_back, color: NipahColors.text, size: 24)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(widget.title, style: NipahTheme.heading(size: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
                       Text('Episode $_currentEpisode', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
@@ -633,89 +765,52 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
             children: [
               GestureDetector(
                 onTap: _seekBackward,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.replay_10, color: Colors.white, size: 32),
-                ),
+                child: Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle), child: Icon(Icons.replay_10, color: Colors.white, size: 32)),
               ),
               const SizedBox(width: 32),
               GestureDetector(
                 onTap: _togglePlayPause,
                 child: Container(
-                  width: 64,
-                  height: 64,
+                  width: 64, height: 64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [NipahColors.gold, NipahColors.goldStrong],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: NipahColors.gold.withValues(alpha: 0.4),
-                        blurRadius: 16,
-                        spreadRadius: 2,
-                      ),
-                    ],
+                    gradient: LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong]),
+                    boxShadow: [BoxShadow(color: NipahColors.gold.withValues(alpha: 0.4), blurRadius: 16, spreadRadius: 2)],
                   ),
-                  child: Icon(
-                    _isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: NipahColors.bg,
-                    size: 36,
-                  ),
+                  child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: NipahColors.bg, size: 36),
                 ),
               ),
               const SizedBox(width: 32),
               GestureDetector(
                 onTap: _seekForward,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.forward_10, color: Colors.white, size: 32),
-                ),
+                child: Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle), child: Icon(Icons.forward_10, color: Colors.white, size: 32)),
               ),
             ],
           ),
         ),
         Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
+          left: 0, right: 0, bottom: 0,
           child: Container(
             padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 16),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [Color(0xc8000000), Colors.transparent],
-              ),
-            ),
+            decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xc8000000), Colors.transparent])),
             child: Column(
               children: [
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: NipahColors.gold,
-                    inactiveTrackColor: NipahColors.surface,
-                    thumbColor: NipahColors.gold,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    trackHeight: 3,
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                    activeTrackColor: NipahColors.gold, inactiveTrackColor: NipahColors.surface,
+                    thumbColor: NipahColors.gold, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    trackHeight: 3, overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
                   ),
                   child: Slider(
-                    value: _duration.inMilliseconds > 0
-                        ? _position.inMilliseconds.toDouble().clamp(0.0, _duration.inMilliseconds.toDouble())
-                        : 0.0,
+                    value: _duration.inMilliseconds > 0 ? _position.inMilliseconds.toDouble().clamp(0.0, _duration.inMilliseconds.toDouble()) : 0.0,
                     max: _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
                     onChanged: (value) {
-                      _player.seek(Duration(milliseconds: value.toInt()));
+                      final seekTo = Duration(milliseconds: value.toInt());
+                      if (_useWebView) {
+                        _webViewController?.runJavaScript('jsseek(${seekTo.inSeconds})');
+                      } else {
+                        _player.seek(seekTo);
+                      }
                       _showControlsBriefly();
                     },
                   ),
@@ -731,28 +826,16 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                             onTap: _showServerSelector,
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: NipahColors.accent.main.withValues(alpha: 0.4)),
-                                color: NipahColors.accent.main.withValues(alpha: 0.1),
-                              ),
-                              child: Text(
-                                _sources[_selectedSourceIndex].server,
-                                style: NipahTheme.label(size: 9, color: NipahColors.gold),
-                              ),
+                              decoration: BoxDecoration(border: Border.all(color: NipahColors.accent.main.withValues(alpha: 0.4)), color: NipahColors.accent.main.withValues(alpha: 0.1)),
+                              child: Text(_sources[_selectedSourceIndex].server, style: NipahTheme.label(size: 9, color: NipahColors.gold)),
                             ),
                           ),
                         if (_sources.length > 1) const SizedBox(width: 12),
                         if (_currentEpisode > 1)
-                          GestureDetector(
-                            onTap: () => _changeEpisode(-1),
-                            child: Icon(Icons.skip_previous, color: Colors.white, size: 24),
-                          ),
+                          GestureDetector(onTap: () => _changeEpisode(-1), child: Icon(Icons.skip_previous, color: Colors.white, size: 24)),
                         if (_currentEpisode < widget.episodes.length) ...[
                           const SizedBox(width: 16),
-                          GestureDetector(
-                            onTap: () => _changeEpisode(1),
-                            child: Icon(Icons.skip_next, color: Colors.white, size: 24),
-                          ),
+                          GestureDetector(onTap: () => _changeEpisode(1), child: Icon(Icons.skip_next, color: Colors.white, size: 24)),
                         ],
                       ],
                     ),

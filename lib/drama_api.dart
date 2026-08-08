@@ -199,7 +199,22 @@ Future<List<StreamSource>> getDramaStreamSources(int mediaId, int episodeNumber)
 
 Future<List<Drama>> getDramasByCountry(String country) async {
   try {
-    final queries = [country, '$country drama', '$country 2024', '$country 2025', '$country love'];
+    final queries = <String>[];
+    if (country == 'Japanese') {
+      queries.addAll(['japanese', 'japan', 'tokyo', 'japanese love', 'japanese school']);
+    } else if (country == 'Korean') {
+      queries.addAll(['korean', 'korea', 'korean drama', 'korean love', 'korean 2025']);
+    } else if (country == 'Chinese') {
+      queries.addAll(['chinese', 'china', 'chinese drama', 'chinese love', 'chinese 2025']);
+    } else if (country == 'Thai') {
+      queries.addAll(['thai', 'thailand', 'thai drama', 'thai love', 'thai 2025']);
+    } else if (country == 'Filipino') {
+      queries.addAll(['filipino', 'philippines', 'pinoy', 'filipino drama']);
+    } else if (country == 'English') {
+      queries.addAll(['english', 'english drama', 'hollywood', 'english 2025']);
+    } else {
+      queries.addAll([country, '$country drama', '$country 2024', '$country 2025', '$country love']);
+    }
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
     final seen = <int>{};
@@ -208,10 +223,30 @@ Future<List<Drama>> getDramasByCountry(String country) async {
     for (final list in results) {
       for (final d in list) {
         if (seen.add(d.id)) {
-          if (d.status.toLowerCase() == 'ongoing') {
-            ongoing.add(d);
-          } else {
-            completed.add(d);
+          final dCountry = d.country.toLowerCase();
+          final matchCountry = country.toLowerCase();
+          if (dCountry.contains(matchCountry) || matchCountry.contains(dCountry) ||
+              (country == 'Japanese' && dCountry == 'japan') ||
+              (country == 'Korean' && dCountry == 'south korea') ||
+              (country == 'Chinese' && (dCountry == 'china' || dCountry == 'hong kong' || dCountry == 'taiwan'))) {
+            if (d.status.toLowerCase() == 'ongoing') {
+              ongoing.add(d);
+            } else {
+              completed.add(d);
+            }
+          }
+        }
+      }
+    }
+    if (ongoing.isEmpty && completed.isEmpty) {
+      for (final list in results) {
+        for (final d in list) {
+          if (seen.add(d.id)) {
+            if (d.status.toLowerCase() == 'ongoing') {
+              ongoing.add(d);
+            } else {
+              completed.add(d);
+            }
           }
         }
       }

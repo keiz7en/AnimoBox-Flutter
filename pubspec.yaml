@@ -1,7 +1,7 @@
 name: animobox
 description: AnimoBox - Anime Streaming App
 publish_to: 'none'
-version: 3.7.5+1
+version: 3.8.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -17,6 +17,7 @@ dependencies:
   media_kit: ^1.1.11
   media_kit_video: ^1.2.5
   media_kit_libs_video: ^1.0.5
+  webview_flutter: ^4.10.0
   cupertino_icons: ^1.0.6
   url_launcher: ^6.2.2
   open_file: ^3.5.0
