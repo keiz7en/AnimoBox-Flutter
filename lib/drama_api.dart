@@ -49,6 +49,7 @@ Future<List<Drama>> getRecentDramas() async {
         if (seen.add(d.id)) dramas.add(d);
       }
     }
+    dramas.sort((a, b) => b.yearValue.compareTo(a.yearValue));
     return dramas.take(40).toList();
   } catch (_) {
     return [];
@@ -278,8 +279,10 @@ Future<List<Drama>> getAiringDramasByCountry(String country) async {
 Future<List<Drama>> getHollywoodDramas() async {
   try {
     final queries = [
-      'american', 'hollywood', 'united states', 'usa',
-      'english', 'netflix', 'disney', 'hbo',
+      '2026', '2025', '2024', 'american', 'usa', 'hollywood',
+      'action', 'horror', 'adventure', 'crime', 'thriller', 'mystery',
+      'movie', 'hbo', 'dc', 'comedy', 'romance', 'war', 'drama',
+      'sport', 'superhero', 'animation', 'scifi', 'fantasy',
     ];
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
@@ -290,8 +293,13 @@ Future<List<Drama>> getHollywoodDramas() async {
         if (seen.add(d.id) && d.isHollywood) dramas.add(d);
       }
     }
-    dramas.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return dramas.take(50).toList();
+    dramas.sort((a, b) {
+      final ya = a.yearValue;
+      final yb = b.yearValue;
+      if (ya != yb) return yb.compareTo(ya);
+      return b.serverEpisodesCount.compareTo(a.serverEpisodesCount);
+    });
+    return dramas.take(60).toList();
   } catch (_) {
     return [];
   }
@@ -299,7 +307,11 @@ Future<List<Drama>> getHollywoodDramas() async {
 
 Future<List<Drama>> getPopularHollywood() async {
   try {
-    final queries = ['american', 'hollywood', 'usa', 'netflix', 'english movie'];
+    final queries = [
+      '2026', '2025', 'american', 'usa', 'hollywood',
+      'action', 'adventure', 'crime', 'movie', 'hbo', 'dc',
+      'horror', 'thriller', 'romance', 'comedy', 'sport',
+    ];
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
     final seen = <int>{};
@@ -316,7 +328,9 @@ Future<List<Drama>> getPopularHollywood() async {
         }
       }
     }
-    return [...ongoing, ...completed].take(40).toList();
+    ongoing.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    completed.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    return [...ongoing, ...completed].take(60).toList();
   } catch (_) {
     return [];
   }
@@ -324,7 +338,11 @@ Future<List<Drama>> getPopularHollywood() async {
 
 Future<List<Drama>> getNewHollywood() async {
   try {
-    final queries = ['hollywood 2026', 'hollywood 2025', 'american new', 'usa new'];
+    final queries = [
+      '2026', '2025', 'american', 'usa', 'hollywood',
+      'action', 'horror', 'adventure', 'crime', 'thriller',
+      'movie', 'comedy', 'romance', 'mystery', 'dc', 'hbo',
+    ];
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
     final seen = <int>{};
@@ -334,8 +352,17 @@ Future<List<Drama>> getNewHollywood() async {
         if (seen.add(d.id) && d.isHollywood) dramas.add(d);
       }
     }
-    dramas.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return dramas.take(40).toList();
+    final currentYear = DateTime.now().year;
+    dramas.sort((a, b) {
+      final ya = a.yearValue;
+      final yb = b.yearValue;
+      final aIsNew = ya >= currentYear;
+      final bIsNew = yb >= currentYear;
+      if (aIsNew && !bIsNew) return -1;
+      if (!aIsNew && bIsNew) return 1;
+      return yb.compareTo(ya);
+    });
+    return dramas.take(60).toList();
   } catch (_) {
     return [];
   }
@@ -343,7 +370,10 @@ Future<List<Drama>> getNewHollywood() async {
 
 Future<List<Drama>> getAiringHollywood() async {
   try {
-    final queries = ['american ongoing', 'hollywood ongoing', 'usa ongoing'];
+    final queries = [
+      '2026', 'american ongoing', 'hollywood ongoing', 'usa ongoing',
+      'hbo', 'series', 'season',
+    ];
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
     final seen = <int>{};
@@ -353,7 +383,8 @@ Future<List<Drama>> getAiringHollywood() async {
         if (seen.add(d.id) && d.isHollywood && d.isOngoing) dramas.add(d);
       }
     }
-    return dramas.take(30).toList();
+    dramas.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    return dramas.take(40).toList();
   } catch (_) {
     return [];
   }

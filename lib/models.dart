@@ -185,7 +185,15 @@ class Drama {
   bool get isHollywood {
     final c = country.toLowerCase();
     return c.contains('united states') || c.contains('united kingdom') ||
-        c.contains('american') || c.contains('usa') || c.contains('uk');
+        c.contains('american') || c.contains('usa') || c.contains('uk') ||
+        c.contains('canada') || c.contains('australia') || c.contains('british');
+  }
+
+  int get yearValue {
+    if (year.isEmpty) return 0;
+    final match = RegExp(r'\b(19|20)\d{2}\b').firstMatch(year);
+    if (match != null) return int.tryParse(match.group(0)!) ?? 0;
+    return 0;
   }
 
   bool get isOngoing {
