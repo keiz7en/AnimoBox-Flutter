@@ -53,6 +53,8 @@ class _WatchPageState extends State<WatchPage> {
   int _tryLinkIndex = 0;
   bool _isRetrying = false;
   String _lastFailedUrl = '';
+  Timer? _loadingTimer;
+  int _loadingSeconds = 0;
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -154,6 +156,7 @@ class _WatchPageState extends State<WatchPage> {
   void dispose() {
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
+    _loadingTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
     WakelockPlus.disable();
@@ -194,6 +197,23 @@ class _WatchPageState extends State<WatchPage> {
     _positionSaveTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (_isPlaying) _saveCurrentPosition();
     });
+  }
+
+  void _startLoadingTimer() {
+    _loadingSeconds = 0;
+    _loadingTimer?.cancel();
+    _loadingTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (mounted) {
+        setState(() => _loadingSeconds++);
+      } else {
+        t.cancel();
+      }
+    });
+  }
+
+  void _stopLoadingTimer() {
+    _loadingTimer?.cancel();
+    _loadingTimer = null;
   }
 
   void _resumeFromPosition() {
@@ -347,14 +367,16 @@ class _WatchPageState extends State<WatchPage> {
 
     try {
       await _player.stop();
+      _startLoadingTimer();
       final headers = _getHeadersForSource(source);
       await _player.open(
         Media(url, httpHeaders: headers),
-      ).timeout(const Duration(seconds: 12), onTimeout: () {
+      ).timeout(const Duration(seconds: 30), onTimeout: () {
         throw Exception('Timeout');
       });
 
       if (_showResumeDialog) {
+        _stopLoadingTimer();
         await _player.pause();
         setState(() {
           _isInitializing = false;
@@ -362,6 +384,7 @@ class _WatchPageState extends State<WatchPage> {
           _showControls = true;
         });
       } else {
+        _stopLoadingTimer();
         setState(() {
           _isInitializing = false;
           _isPlaying = true;
@@ -372,6 +395,7 @@ class _WatchPageState extends State<WatchPage> {
       _resetHideTimer();
       _saveWatchHistory();
     } catch (e) {
+      _stopLoadingTimer();
       debugPrint('WatchPage: Failed to open $url - $e');
       _trySourceIndex++;
       _tryNextSource();
@@ -713,6 +737,11 @@ class _WatchPageState extends State<WatchPage> {
           Text(
             '${L10n.t('loading')} ${L10n.t('episode')} $_currentEpisode...',
             style: NipahTheme.body(color: NipahColors.textSoft),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Loading... ${_loadingSeconds}s  •  Server ${_trySourceIndex + 1}',
+            style: NipahTheme.body(size: 12, color: NipahColors.textDim),
           ),
         ],
       );

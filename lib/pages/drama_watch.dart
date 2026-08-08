@@ -59,6 +59,8 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   int _tryLinkIndex = 0;
   bool _isRetrying = false;
   String _lastFailedUrl = '';
+  Timer? _loadingTimer;
+  int _loadingSeconds = 0;
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
@@ -136,6 +138,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   void dispose() {
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
+    _loadingTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
     WakelockPlus.disable();
@@ -176,6 +179,23 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _positionSaveTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (_isPlaying) _saveCurrentPosition();
     });
+  }
+
+  void _startLoadingTimer() {
+    _loadingSeconds = 0;
+    _loadingTimer?.cancel();
+    _loadingTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (mounted) {
+        setState(() => _loadingSeconds++);
+      } else {
+        t.cancel();
+      }
+    });
+  }
+
+  void _stopLoadingTimer() {
+    _loadingTimer?.cancel();
+    _loadingTimer = null;
   }
 
   void _resumeFromPosition() {
@@ -325,6 +345,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     }
     try {
       await _player.stop();
+      _startLoadingTimer();
       final headers = <String, String>{
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       };
@@ -332,11 +353,12 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         headers['Referer'] = 'https://kissasian.dev/';
       }
       await _player.open(Media(url, httpHeaders: headers))
-          .timeout(const Duration(seconds: 12), onTimeout: () {
+          .timeout(const Duration(seconds: 30), onTimeout: () {
         throw Exception('Timeout');
       });
 
       if (_showResumeDialog) {
+        _stopLoadingTimer();
         await _player.pause();
         if (mounted) {
           setState(() {
@@ -346,6 +368,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           });
         }
       } else {
+        _stopLoadingTimer();
         if (mounted) {
           setState(() {
             _isInitializing = false;
@@ -358,6 +381,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       _resetHideTimer();
       _saveWatchHistory();
     } catch (e) {
+      _stopLoadingTimer();
       debugPrint('DramaWatch: MediaKit failed $url - $e');
       _trySourceIndex++;
       _tryNextSource();
@@ -472,12 +496,15 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
             Positioned.fill(
               child: Container(
                 color: Colors.black,
-                child: const Center(
+                child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      NipahLoader(size: 28),
-                      SizedBox(height: 16),
+                      const NipahLoader(size: 28),
+                      const SizedBox(height: 16),
+                      Text('Loading... ${_loadingSeconds}s', style: NipahTheme.body(size: 13, color: NipahColors.textSoft)),
+                      const SizedBox(height: 4),
+                      Text('Server ${_trySourceIndex + 1} of ${_sources.length}', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
                     ],
                   ),
                 ),
