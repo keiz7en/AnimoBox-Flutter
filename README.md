@@ -1,5 +1,15 @@
 # LimeSugar
 
+![GitHub release](https://img.shields.io/github/v/release/keiz7en/AnimoBox-Flutter?include_prereleases&label=Release&color=gold)
+![GitHub all releases](https://img.shields.io/github/downloads/keiz7en/AnimoBox-Flutter/total?label=Downloads&color=brightgreen)
+![GitHub stars](https://img.shields.io/github/stars/keiz7en/AnimoBox-Flutter?style=flat&color=gold)
+![GitHub forks](https://img.shields.io/github/forks/keiz7en/AnimoBox-Flutter?style=flat&color=gold)
+![GitHub issues](https://img.shields.io/github/issues/keiz7en/AnimoBox-Flutter?style=flat&color=red)
+![GitHub last commit](https://img.shields.io/github/last-commit/keiz7en/AnimoBox-Flutter?style=flat&color=blue)
+![GitHub license](https://img.shields.io/github/license/keiz7en/AnimoBox-Flutter?style=flat&color=orange)
+![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Web-blue)
+![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)
+
 **LimeSugar** - Premium Anime, Drama & Hollywood Streaming App
 
 Built with Flutter for Android, iOS, Windows, macOS, Linux & Web.
