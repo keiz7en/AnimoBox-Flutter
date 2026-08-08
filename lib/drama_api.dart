@@ -58,7 +58,11 @@ Future<List<Drama>> getRecentDramas() async {
 
 Future<List<Drama>> getPopularDramas() async {
   try {
-    final queries = ['love', 'show', 'movie', 'korean', 'japanese'];
+    final queries = [
+      '2026', '2025', '2024', 'love', 'show', 'movie',
+      'korean', 'japanese', 'chinese', 'thai', 'filipino',
+      'action', 'thriller', 'romance', 'comedy', 'drama',
+    ];
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
     final seen = <int>{};
@@ -75,7 +79,9 @@ Future<List<Drama>> getPopularDramas() async {
         }
       }
     }
-    return [...ongoing, ...completed].take(40).toList();
+    ongoing.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    completed.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    return [...ongoing, ...completed].take(60).toList();
   } catch (_) {
     return [];
   }
@@ -83,7 +89,10 @@ Future<List<Drama>> getPopularDramas() async {
 
 Future<List<Drama>> getNewDramas() async {
   try {
-    final queries = ['chinese', 'hollywood', 'family', 'action', 'comedy'];
+    final queries = [
+      '2026', '2025', '2024', 'chinese', 'korean', 'japanese',
+      'thai', 'filipino', 'action', 'comedy', 'romance', 'thriller',
+    ];
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
     final seen = <int>{};
@@ -93,7 +102,17 @@ Future<List<Drama>> getNewDramas() async {
         if (seen.add(d.id)) dramas.add(d);
       }
     }
-    return dramas.take(40).toList();
+    final currentYear = DateTime.now().year;
+    dramas.sort((a, b) {
+      final ya = a.yearValue;
+      final yb = b.yearValue;
+      final aIsNew = ya >= currentYear;
+      final bIsNew = yb >= currentYear;
+      if (aIsNew && !bIsNew) return -1;
+      if (!aIsNew && bIsNew) return 1;
+      return yb.compareTo(ya);
+    });
+    return dramas.take(60).toList();
   } catch (_) {
     return [];
   }
@@ -202,19 +221,19 @@ Future<List<Drama>> getDramasByCountry(String country) async {
   try {
     final queries = <String>[];
     if (country == 'Japanese') {
-      queries.addAll(['japanese', 'japan', 'tokyo', 'japanese love', 'japanese school']);
+      queries.addAll(['japanese', 'japan', 'tokyo', 'japanese love', 'japanese school', 'anime', '2026', '2025']);
     } else if (country == 'Korean') {
-      queries.addAll(['korean', 'korea', 'korean drama', 'korean love', 'korean 2025']);
+      queries.addAll(['korean', 'korea', 'korean drama', 'korean love', 'korean 2025', 'korean 2026', 'kdrama']);
     } else if (country == 'Chinese') {
-      queries.addAll(['chinese', 'china', 'chinese drama', 'chinese love', 'chinese 2025']);
+      queries.addAll(['chinese', 'china', 'chinese drama', 'chinese love', 'chinese 2025', 'chinese 2026', 'cdrama']);
     } else if (country == 'Thai') {
-      queries.addAll(['thai', 'thailand', 'thai drama', 'thai love', 'thai 2025']);
+      queries.addAll(['thai', 'thailand', 'thai drama', 'thai love', 'thai 2025', 'thai 2026']);
     } else if (country == 'Filipino') {
-      queries.addAll(['filipino', 'philippines', 'pinoy', 'filipino drama']);
+      queries.addAll(['filipino', 'philippines', 'pinoy', 'filipino drama', 'filipino 2025']);
     } else if (country == 'English') {
-      queries.addAll(['english', 'english drama', 'hollywood', 'english 2025']);
+      queries.addAll(['english', 'english drama', 'hollywood', 'english 2025', 'american', 'usa']);
     } else {
-      queries.addAll([country, '$country drama', '$country 2024', '$country 2025', '$country love']);
+      queries.addAll([country, '$country drama', '$country 2024', '$country 2025', '$country 2026', '$country love', '$country action']);
     }
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
@@ -252,7 +271,9 @@ Future<List<Drama>> getDramasByCountry(String country) async {
         }
       }
     }
-    return [...ongoing, ...completed].take(50).toList();
+    ongoing.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    completed.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    return [...ongoing, ...completed].take(60).toList();
   } catch (_) {
     return [];
   }
@@ -260,7 +281,7 @@ Future<List<Drama>> getDramasByCountry(String country) async {
 
 Future<List<Drama>> getAiringDramasByCountry(String country) async {
   try {
-    final queries = [country, '$country ongoing', '$country airing'];
+    final queries = [country, '$country ongoing', '$country airing', '$country 2026', '$country 2025'];
     final futures = queries.map((q) => searchDramas(q)).toList();
     final results = await Future.wait(futures);
     final seen = <int>{};
@@ -270,7 +291,8 @@ Future<List<Drama>> getAiringDramasByCountry(String country) async {
         if (seen.add(d.id) && d.isOngoing) dramas.add(d);
       }
     }
-    return dramas.take(30).toList();
+    dramas.sort((a, b) => b.yearValue.compareTo(a.yearValue));
+    return dramas.take(40).toList();
   } catch (_) {
     return [];
   }

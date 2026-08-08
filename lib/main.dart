@@ -182,6 +182,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    const limeColor = Color(0xFF78C850);
+    const limeStrong = Color(0xFFA0E070);
     return Scaffold(
       backgroundColor: NipahColors.bg,
       body: Center(
@@ -199,16 +201,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [NipahColors.gold, NipahColors.goldStrong],
+                          colors: [limeColor, limeStrong],
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: NipahColors.gold.withValues(alpha: _glowAnim.value * 0.5),
-                            blurRadius: 30 + (_glowAnim.value * 20),
-                            spreadRadius: _glowAnim.value * 5,
+                            color: limeColor.withValues(alpha: _glowAnim.value * 0.6),
+                            blurRadius: 30 + (_glowAnim.value * 25),
+                            spreadRadius: _glowAnim.value * 8,
                           ),
                         ],
                       ),
@@ -220,6 +222,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       style: NipahTheme.heading(size: 32).copyWith(
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
+                        color: limeColor,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -355,28 +358,28 @@ class _MainScreenState extends State<MainScreen> {
     if (_appMode == 'anime') {
       return const [HomePage(), SearchPage(), LibraryPage(), HistoryPage(), SettingsPage()];
     }
-    return const [HomePage(), HistoryPage(), SettingsPage()];
+    return const [HomePage(), SearchPage(), HistoryPage(), SettingsPage()];
   }
 
   List<IconData> get _icons {
     if (_appMode == 'anime') {
       return const [Icons.home_outlined, Icons.search, Icons.library_books_outlined, Icons.history_outlined, Icons.settings_outlined];
     }
-    return const [Icons.home_outlined, Icons.history_outlined, Icons.settings_outlined];
+    return const [Icons.home_outlined, Icons.search, Icons.history_outlined, Icons.settings_outlined];
   }
 
   List<IconData> get _selectedIcons {
     if (_appMode == 'anime') {
       return const [Icons.home, Icons.search, Icons.library_books, Icons.history, Icons.settings];
     }
-    return const [Icons.home, Icons.history, Icons.settings];
+    return const [Icons.home, Icons.search, Icons.history, Icons.settings];
   }
 
   List<String> get _labels {
     if (_appMode == 'anime') {
       return const ['Home', 'Search', 'Library', 'History', 'Settings'];
     }
-    return const ['Home', 'History', 'Settings'];
+    return const ['Home', 'Search', 'History', 'Settings'];
   }
 
   @override

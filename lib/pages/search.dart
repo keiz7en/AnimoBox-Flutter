@@ -339,13 +339,15 @@ class _SearchPageState extends State<SearchPage> with SingleTickerProviderStateM
           children: [
             Icon(Icons.search_off, size: 64, color: NipahColors.textDim),
             const SizedBox(height: 16),
-            Text('No dramas found', style: NipahTheme.body(color: NipahColors.textDim)),
+            Text(_appMode == 'hollywood' ? 'No movies found' : 'No dramas found', style: NipahTheme.body(color: NipahColors.textDim)),
           ],
         ),
       );
     }
     if (_dramaResults.isEmpty) {
-      final dramaQuickSearches = ['Squid Game', 'Crash Landing', 'Vincenzo', 'One Piece', 'Naruto', 'Movie'];
+      final dramaQuickSearches = _appMode == 'hollywood'
+          ? ['Scream', 'Smile', 'Nosferatu', 'Minecraft', 'Nobody', 'Nuremberg']
+          : ['Squid Game', 'Crash Landing', 'Vincenzo', 'One Piece', 'Naruto', 'Movie'];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
