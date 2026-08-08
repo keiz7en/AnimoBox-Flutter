@@ -21,9 +21,7 @@ String _parseVideoUrl(String raw) {
 }
 
 bool _isDeadCdn(String url) {
-  if (url.isEmpty) return true;
-  final lower = url.toLowerCase();
-  return lower.contains('dsaqtqpt.pro') || lower.contains('cloudokyo.cloud');
+  return url.isEmpty;
 }
 
 Future<List<Drama>> searchDramas(String query) async {
