@@ -16,6 +16,14 @@ Built with Flutter for Android, iOS, Windows, macOS, Linux & Web.
 
 ---
 
+### Screenshots
+
+| Home (Anime) | Player (Drama) | Library (Hollywood) |
+|:---:|:---:|:---:|
+| ![Home](screenshot1.jpg) | ![Player](screenshot2.jpg) | ![Library](screenshot3.jpg) |
+
+---
+
 ## Features
 
 ### Content Library
