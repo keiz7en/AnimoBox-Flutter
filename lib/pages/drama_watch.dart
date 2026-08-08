@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:android_intent_plus/flag.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../api.dart';
@@ -64,7 +66,11 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   void initState() {
     super.initState();
     _currentEpisode = widget.episode;
-    _player = Player();
+    _player = Player(
+      configuration: const PlayerConfiguration(
+        bufferSize: 1024 * 1024 * 8,
+      ),
+    );
     _videoController = VideoController(_player);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
@@ -96,7 +102,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         _isRetrying = true;
         debugPrint('DramaWatch: MediaKit error: $error');
         _trySourceIndex++;
-        Future.delayed(const Duration(milliseconds: 500), () {
+        Future.delayed(const Duration(milliseconds: 150), () {
           if (mounted) {
             _isRetrying = false;
             _tryNextSource();
@@ -325,7 +331,10 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       if (url.contains('.m3u8')) {
         headers['Referer'] = 'https://kissasian.dev/';
       }
-      await _player.open(Media(url, httpHeaders: headers));
+      await _player.open(Media(url, httpHeaders: headers))
+          .timeout(const Duration(seconds: 12), onTimeout: () {
+        throw Exception('Timeout');
+      });
 
       if (_showResumeDialog) {
         await _player.pause();
@@ -380,11 +389,21 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   Future<void> _openInExternalPlayer() async {
     if (_lastFailedUrl.isEmpty) return;
     try {
-      await launchUrl(
-        Uri.parse(_lastFailedUrl),
-        mode: LaunchMode.externalApplication,
+      final intent = AndroidIntent(
+        action: 'android.intent.action.VIEW',
+        data: _lastFailedUrl,
+        type: 'video/*',
+        flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
       );
-    } catch (_) {}
+      await intent.launch();
+    } catch (_) {
+      try {
+        await launchUrl(
+          Uri.parse(_lastFailedUrl),
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> _openVlcPlayStore() async {
