@@ -106,7 +106,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 border: Border.fromBorderSide(
                   BorderSide(color: NipahColors.gold),
                 ),
-                color: Color(0x1ad7a35a),
+                color: const Color(0x1ad7a35a),
               ),
               child: Text(
                 '${_history.length} ${L10n.t('episodesCount')}',

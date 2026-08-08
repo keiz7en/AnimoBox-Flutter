@@ -502,7 +502,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             if (drama.country.isNotEmpty)
                               _HeroChip(text: drama.country),
                             if (drama.rating > 0)
-                              _HeroChip(text: '${drama.rating.toStringAsFixed(1)}'),
+                              _HeroChip(text: drama.rating.toStringAsFixed(1)),
                           ],
                         ),
                         const SizedBox(height: 10),

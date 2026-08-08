@@ -62,7 +62,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   Timer? _loadingTimer;
   int _loadingSeconds = 0;
 
-  String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
+  String get _positionKey => '${widget.mediaId}_drama_ep$_currentEpisode';
 
   @override
   void initState() {
@@ -430,15 +430,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     }
   }
 
-  Future<void> _openVlcPlayStore() async {
-    try {
-      await launchUrl(
-        Uri.parse('https://play.google.com/store/apps/details?id=org.videolan.vlc'),
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {}
-  }
-
   void _switchServer(int sourceIndex) {
     if (sourceIndex < 0 || sourceIndex >= _sources.length) return;
     _selectedSourceIndex = sourceIndex;
@@ -655,7 +646,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
             children: [
               GestureDetector(
                 onTap: _seekBackward,
-                child: Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle), child: Icon(Icons.replay_10, color: Colors.white, size: 32)),
+                child: Container(width: 48, height: 48, decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle), child: const Icon(Icons.replay_10, color: Colors.white, size: 32)),
               ),
               const SizedBox(width: 32),
               GestureDetector(
@@ -673,7 +664,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
               const SizedBox(width: 32),
               GestureDetector(
                 onTap: _seekForward,
-                child: Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle), child: Icon(Icons.forward_10, color: Colors.white, size: 32)),
+                child: Container(width: 48, height: 48, decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle), child: const Icon(Icons.forward_10, color: Colors.white, size: 32)),
               ),
             ],
           ),
@@ -717,10 +708,10 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                           ),
                         if (_sources.length > 1) const SizedBox(width: 12),
                         if (_currentEpisode > 1)
-                          GestureDetector(onTap: () => _changeEpisode(-1), child: Icon(Icons.skip_previous, color: Colors.white, size: 24)),
+                          GestureDetector(onTap: () => _changeEpisode(-1), child: const Icon(Icons.skip_previous, color: Colors.white, size: 24)),
                         if (_currentEpisode < widget.episodes.length) ...[
                           const SizedBox(width: 16),
-                          GestureDetector(onTap: () => _changeEpisode(1), child: Icon(Icons.skip_next, color: Colors.white, size: 24)),
+                          GestureDetector(onTap: () => _changeEpisode(1), child: const Icon(Icons.skip_next, color: Colors.white, size: 24)),
                         ],
                       ],
                     ),

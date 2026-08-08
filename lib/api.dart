@@ -497,7 +497,7 @@ Future<String?> _resolvePaheUrl(String paheUrl) async {
       request.headers.addAll({
         'User-Agent': _defaultUA,
         'Referer': '$_anikotoBase/',
-        'Origin': '$_anikotoBase',
+        'Origin': _anikotoBase,
       });
       final streamedResponse = await client.send(request).timeout(const Duration(seconds: 15));
       final workerResp = await http.Response.fromStream(streamedResponse);

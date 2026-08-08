@@ -59,7 +59,7 @@ class _WatchPageState extends State<WatchPage> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
-  String get _positionKey => '${widget.anilistId}_ep${_currentEpisode}';
+  String get _positionKey => '${widget.anilistId}_ep$_currentEpisode';
 
   Duration _lastSavedPosition = Duration.zero;
 
@@ -604,15 +604,6 @@ class _WatchPageState extends State<WatchPage> {
     }
   }
 
-  Future<void> _openVlcPlayStore() async {
-    try {
-      await launchUrl(
-        Uri.parse('https://play.google.com/store/apps/details?id=org.videolan.vlc'),
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {}
-  }
-
   int _selectBestLink(StreamSource source) {
     if (source.links.isEmpty) return 0;
     if (_preferredQuality == 'Auto') return 0;
@@ -866,7 +857,7 @@ class _WatchPageState extends State<WatchPage> {
                   border: Border.fromBorderSide(
                     BorderSide(color: NipahColors.gold),
                   ),
-                  color: Color(0x1ad7a35a),
+                  color: const Color(0x1ad7a35a),
                 ),
                 child: Text(
                   _getSourceShortName(_sources[_selectedSourceIndex].server),

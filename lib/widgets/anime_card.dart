@@ -224,7 +224,7 @@ class _AnimeCardState extends State<AnimeCard> {
                             border: Border.fromBorderSide(
                               BorderSide(color: NipahColors.line),
                             ),
-                            color: Color(0x1ad7a35a),
+                            color: const Color(0x1ad7a35a),
                           ),
                           child: Text(
                             '${widget.anime.episodes} eps',

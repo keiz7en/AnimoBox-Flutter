@@ -350,7 +350,7 @@ class _AnimeDetailPageState extends State<AnimeDetailPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   border: Border.fromBorderSide(BorderSide(color: NipahColors.line)),
-                  color: Color(0x1ad7a35a),
+                  color: const Color(0x1ad7a35a),
                 ),
                 child: Text('EP ${anime.nextAiringEpisode} NEXT', style: NipahTheme.label(size: 10, color: NipahColors.goldStrong)),
               ),

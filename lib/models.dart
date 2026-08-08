@@ -188,7 +188,7 @@ class Drama {
     if (epCount <= 1) return false;
     if (createdAt <= 0) return epCount > 1;
     final now = DateTime.now().millisecondsSinceEpoch;
-    final thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     return (now - createdAt) < thirtyDaysMs;
   }
 
@@ -217,6 +217,7 @@ class Drama {
 }
 
 class DramaDetail extends Drama {
+  @override
   final int serverEpisodesCount;
 
   DramaDetail({

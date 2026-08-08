@@ -187,7 +187,7 @@ class _LibraryPageState extends State<LibraryPage> with SingleTickerProviderStat
               border: Border.fromBorderSide(
                 BorderSide(color: NipahColors.gold),
               ),
-              color: Color(0x1ad7a35a),
+              color: const Color(0x1ad7a35a),
             ),
             child: Text(
               '${_library.length} anime',
