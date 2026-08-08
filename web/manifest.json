@@ -1,11 +1,11 @@
 {
-    "name": "animobox",
-    "short_name": "animobox",
+    "name": "limesugar",
+    "short_name": "limesugar",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#090a0c",
     "theme_color": "#090a0c",
-    "description": "AnimoBox - Anime Streaming",
+    "description": "LimeSugar - Anime, Drama & Hollywood",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

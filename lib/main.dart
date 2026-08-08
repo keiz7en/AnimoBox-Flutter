@@ -30,16 +30,16 @@ void main() async {
     systemNavigationBarColor: NipahColors.bg,
     systemNavigationBarIconBrightness: Brightness.light,
   ));
-  runApp(const AnimoBoxApp());
+  runApp(const LimeSugarApp());
 }
 
-class AnimoBoxApp extends StatelessWidget {
-  const AnimoBoxApp({super.key});
+class LimeSugarApp extends StatelessWidget {
+  const LimeSugarApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AnimoBox',
+      title: 'LimeSugar',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -118,20 +118,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _controller;
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
+  late Animation<double> _glowAnim;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000));
     _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.6, curve: Curves.easeOut)),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.15, curve: Curves.easeOut)),
     );
-    _scaleAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack)),
+    _scaleAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.2, curve: Curves.easeOutBack)),
+    );
+    _glowAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.1, 0.5, curve: Curves.easeInOut)),
     );
     _controller.forward();
 
-    Future.delayed(const Duration(milliseconds: 1000), () async {
+    Future.delayed(const Duration(milliseconds: 3000), () async {
       if (!mounted) return;
       try {
         final info = await PackageInfo.fromPlatform();
@@ -192,21 +196,37 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 76,
-                      height: 76,
+                      width: 80,
+                      height: 80,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [NipahColors.gold, NipahColors.goldStrong],
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: NipahColors.gold.withValues(alpha: _glowAnim.value * 0.5),
+                            blurRadius: 30 + (_glowAnim.value * 20),
+                            spreadRadius: _glowAnim.value * 5,
+                          ),
+                        ],
                       ),
-                      child: Icon(Icons.movie_filter, color: NipahColors.bg, size: 42),
+                      child: Icon(Icons.movie_filter, color: NipahColors.bg, size: 44),
                     ),
-                    const SizedBox(height: 20),
-                    Text('AnimoBox', style: NipahTheme.heading(size: 26)),
-                    const SizedBox(height: 6),
-                    Text('ANIME STREAMING', style: NipahTheme.label(size: 10, color: NipahColors.textDim)),
+                    const SizedBox(height: 24),
+                    Text(
+                      'LimeSugar',
+                      style: NipahTheme.heading(size: 32).copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'ANIME  ·  DRAMA  ·  HOLLYWOOD',
+                      style: NipahTheme.label(size: 10, color: NipahColors.textDim, letterSpacing: 1.5),
+                    ),
                   ],
                 ),
               ),
@@ -244,7 +264,7 @@ class _ForceUpdateDialogState extends State<_ForceUpdateDialog> {
       } catch (_) {
         dirPath = (await getApplicationDocumentsDirectory()).path;
       }
-      _filePath = '$dirPath/AnimoBox-${widget.latestVersion}.apk';
+      _filePath = '$dirPath/LimeSugar-${widget.latestVersion}.apk';
       final file = File(_filePath);
       final request = http.Request('GET', Uri.parse(widget.apkUrl!));
       final response = await http.Client().send(request);

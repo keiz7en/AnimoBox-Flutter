@@ -2,73 +2,58 @@ from PIL import Image, ImageDraw, ImageFont
 import os, math
 
 BG = (9, 10, 12)
-GOLD = (215, 163, 90)
-GOLD_LIGHT = (239, 191, 122)
-GOLD_DARK = (180, 130, 60)
+LIME = (120, 200, 80)
+LIME_LIGHT = (160, 230, 110)
+LIME_DARK = (80, 150, 50)
+SUGAR = (255, 245, 230)
 WHITE = (243, 239, 232)
-BLUE = (80, 130, 210)
-PURPLE = (120, 80, 170)
-DARK_BLUE = (40, 60, 100)
+GOLD = (215, 163, 90)
 
 def create_icon(size):
     img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     s = size / 100
 
-    # RPG gold frame
+    # Lime green frame
     bw = max(2, int(3 * s))
-    draw.rectangle([0, 0, size-1, size-1], fill=GOLD)
+    draw.rectangle([0, 0, size-1, size-1], fill=LIME)
     draw.rectangle([bw, bw, size-1-bw, size-1-bw], fill=BG)
 
-    # Inner gold line
+    # Inner green line
     iw = max(1, int(1.5 * s))
-    draw.rectangle([iw, iw, size-1-iw, size-1-iw], outline=GOLD_DARK, width=1)
+    draw.rectangle([iw, iw, size-1-iw, size-1-iw], outline=LIME_DARK, width=1)
 
-    cx, cy = size/2, size/2 - 2*s
+    cx, cy = size/2, size/2 - 4*s
 
-    # Gojo face - oval shape
-    face_w, face_h = int(30*s), int(36*s)
-    face_bbox = [cx-face_w, cy-face_h+int(8*s), cx+face_w, cy+face_h+int(8*s)]
-    draw.ellipse(face_bbox, fill=(220, 200, 180))
+    # Lime slice - circle
+    lime_r = int(28 * s)
+    draw.ellipse([cx-lime_r, cy-lime_r, cx+lime_r, cy+lime_r], fill=LIME)
 
-    # Hair - dark blue messy spiky
-    hair_color = DARK_BLUE
-    for i in range(7):
-        angle = math.radians(-80 + i * 25)
-        spike_len = int((28 + (i%3)*8) * s)
-        sx = cx + int(face_w * 0.8 * math.cos(angle))
-        sy = cy - int(face_h * 0.6) + int(8*s) + int(face_h * 0.5 * math.sin(angle))
-        ex = cx + int(spike_len * math.cos(angle - 0.3))
-        ey = sy - int(spike_len * 0.6)
-        draw.polygon([(sx, sy), (ex, ey), (sx + int(8*s), sy)], fill=hair_color)
-    # Hair base
-    draw.ellipse([cx-face_w-int(2*s), cy-face_h-int(2*s)+int(8*s), cx+face_w+int(2*s), cy-int(2*s)+int(8*s)], fill=hair_color)
+    # Inner lime flesh
+    flesh_r = int(22 * s)
+    draw.ellipse([cx-flesh_r, cy-flesh_r, cx+flesh_r, cy+flesh_r], fill=LIME_LIGHT)
 
-    # Blindfold / eye area
-    blind_y = cy + int(4*s)
-    blind_h = int(10*s)
-    draw.rectangle([cx-face_w+int(6*s), blind_y-blind_h, cx+face_w-int(6*s), blind_y+blind_h], fill=(30, 30, 40))
+    # Lime segments (like a citrus slice)
+    for i in range(6):
+        angle = math.radians(i * 60)
+        x1 = cx + int(flesh_r * 0.3 * math.cos(angle))
+        y1 = cy + int(flesh_r * 0.3 * math.sin(angle))
+        x2 = cx + int(flesh_r * 0.9 * math.cos(angle))
+        y2 = cy + int(flesh_r * 0.9 * math.sin(angle))
+        draw.line([(x1, y1), (x2, y2)], fill=SUGAR, width=max(1, int(1.5*s)))
 
-    # Left eye (partially visible)
-    le_x, le_y = cx - int(14*s), blind_y
-    draw.ellipse([le_x-int(8*s), le_y-int(6*s), le_x+int(8*s), le_y+int(6*s)], fill=WHITE)
-    draw.ellipse([le_x-int(5*s), le_y-int(5*s), le_x+int(5*s), le_y+int(5*s)], fill=BLUE)
-    draw.ellipse([le_x-int(2*s), le_y-int(2*s), le_x+int(2*s), le_y+int(2*s)], fill=PURPLE)
-    draw.ellipse([le_x-int(1*s), le_y-int(1*s), le_x+int(1*s), le_y+int(1*s)], fill=GOLD)
+    # Center dot
+    dot_r = int(4 * s)
+    draw.ellipse([cx-dot_r, cy-dot_r, cx+dot_r, cy+dot_r], fill=SUGAR)
 
-    # Right eye (partially visible)
-    re_x, re_y = cx + int(14*s), blind_y
-    draw.ellipse([re_x-int(8*s), re_y-int(6*s), re_x+int(8*s), re_y+int(6*s)], fill=WHITE)
-    draw.ellipse([re_x-int(5*s), re_y-int(5*s), re_x+int(5*s), re_y+int(5*s)], fill=BLUE)
-    draw.ellipse([re_x-int(2*s), re_y-int(2*s), re_x+int(2*s), re_y+int(2*s)], fill=PURPLE)
-    draw.ellipse([re_x-int(1*s), re_y-int(1*s), re_x+int(1*s), re_y+int(1*s)], fill=GOLD)
-
-    # Nose
-    draw.polygon([(cx, cy+int(10*s)), (cx-int(2*s), cy+int(16*s)), (cx+int(2*s), cy+int(16*s))], fill=(200, 180, 160))
-
-    # Smile
-    smile_y = cy + int(22*s)
-    draw.arc([cx-int(10*s), smile_y-int(4*s), cx+int(10*s), smile_y+int(6*s)], 0, 180, fill=(180, 120, 120), width=max(1, int(1.5*s)))
+    # Sugar crystals scattered
+    import random
+    random.seed(42)
+    for _ in range(12):
+        rx = cx + random.randint(-int(18*s), int(18*s))
+        ry = cy + random.randint(-int(18*s), int(18*s))
+        cr = random.randint(int(1*s), int(2*s))
+        draw.ellipse([rx-cr, ry-cr, rx+cr, ry+cr], fill=(255, 255, 255, 180))
 
     # RPG corner decorations
     cs = int(7*s)
@@ -78,17 +63,17 @@ def create_icon(size):
         [(0,size),(cs,size),(0,size-cs)],
         [(size,size),(size-cs,size),(size,size-cs)],
     ]:
-        draw.polygon(pts, fill=GOLD_DARK)
+        draw.polygon(pts, fill=LIME_DARK)
 
-    # "ANIMBOX" text
+    # "LIMESUGAR" text
     try:
-        font = ImageFont.truetype("arial.ttf", max(8, int(9*s)))
+        font = ImageFont.truetype("arial.ttf", max(7, int(8*s)))
     except:
         font = ImageFont.load_default()
-    text = "ANIMBOX"
+    text = "LIMESUGAR"
     bbox = draw.textbbox((0,0), text, font=font)
     tw = bbox[2] - bbox[0]
-    draw.text((cx-tw/2, size - int(14*s)), text, fill=GOLD, font=font)
+    draw.text((cx-tw/2, size - int(14*s)), text, fill=LIME, font=font)
 
     return img
 

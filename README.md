@@ -1,6 +1,6 @@
-# animobox
+# limesugar
 
-A new Flutter project.
+LimeSugar - Anime, Drama & Hollywood Streaming App
 
 ## Getting Started
 

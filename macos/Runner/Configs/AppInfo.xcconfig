@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = animobox
+PRODUCT_NAME = limesugar
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.animobox.animobox
+PRODUCT_BUNDLE_IDENTIFIER = com.limesugar.limesugar
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.animobox. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 com.limesugar. All rights reserved.

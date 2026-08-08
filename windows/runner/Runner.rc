@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.animobox" "\0"
-            VALUE "FileDescription", "animobox" "\0"
+            VALUE "CompanyName", "com.limesugar" "\0"
+            VALUE "FileDescription", "limesugar" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "animobox" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.animobox. All rights reserved." "\0"
-            VALUE "OriginalFilename", "animobox.exe" "\0"
-            VALUE "ProductName", "animobox" "\0"
+            VALUE "InternalName", "limesugar" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.limesugar. All rights reserved." "\0"
+            VALUE "OriginalFilename", "limesugar.exe" "\0"
+            VALUE "ProductName", "limesugar" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

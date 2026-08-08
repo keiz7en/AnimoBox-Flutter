@@ -1189,7 +1189,7 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('AnimoBox', style: NipahTheme.heading(size: 18)),
+                Text('LimeSugar', style: NipahTheme.heading(size: 18)),
                 const SizedBox(height: 2),
                 Text('Version $_appVersion', style: NipahTheme.body(size: 12, color: NipahColors.textDim)),
               ],
@@ -1394,7 +1394,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
       } catch (_) {
         dirPath = (await getApplicationDocumentsDirectory()).path;
       }
-      _filePath = '$dirPath/AnimoBox-${widget.latestVersion}.apk';
+      _filePath = '$dirPath/LimeSugar-${widget.latestVersion}.apk';
       final file = File(_filePath);
       final request = http.Request('GET', Uri.parse(widget.apkUrl!));
       final response = await http.Client().send(request);
