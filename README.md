@@ -96,10 +96,17 @@ Built with Flutter for Android, iOS, Windows, macOS, Linux & Web.
 
 ## Download
 
-Latest release: [v5.1.4](https://github.com/keiz7en/LimeSugar/releases/latest)
+### Latest Release: [v5.1.4](https://github.com/keiz7en/LimeSugar/releases/tag/v5.1.4)
 
-- **APK** — Android 5.0+
-- **Source** — Private (contact for access)
+| Platform | Download | Requirements |
+|:---:|:---:|:---|
+| **Android** | [![Download Android](https://img.shields.io/badge/Download%20APK-77.1%20MB-4CAF50?style=for-the-badge&logo=android&logoColor=white)](https://github.com/keiz7en/LimeSugar/releases/download/v5.1.4/app-release.apk) | Android 5.0+ (API 21) |
+| **Windows** | [![Download Windows](https://img.shields.io/badge/Download%20EXE-77.1%20MB-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/keiz7en/LimeSugar/releases/download/v5.1.4/limesugar-windows.zip) | Windows 10/11 (x64) |
+| **Linux** | [![Download Linux](https://img.shields.io/badge/Download%20Linux-77.1%20MB-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/keiz7en/LimeSugar/releases/download/v5.1.4/limesugar-linux.tar.gz) | Ubuntu 20.04+ / Debian 11+ (x64) |
+
+> **Note:** Windows & Linux builds are available in the release assets. macOS, iOS, and Web builds coming soon.
+
+- **Source Code** — Private (contact for access)
 
 ---
 
