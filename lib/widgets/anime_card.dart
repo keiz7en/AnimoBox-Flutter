@@ -167,30 +167,10 @@ class _AnimeCardState extends State<AnimeCard> {
                           ),
                         ),
                       ),
-                    if (widget.isNew)
-                      Positioned(
-                        top: 6,
-                        left: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: NipahColors.gold,
-                          ),
-                          child: Text(
-                            'NEW',
-                            style: TextStyle(
-                              color: NipahColors.bg,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.08,
-                            ),
-                          ),
-                        ),
-                      ),
                     if (_airCountdown.isNotEmpty)
                       Positioned(
                         top: 6,
-                        left: widget.isNew ? 42 : 6,
+                        left: 6,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -214,7 +194,27 @@ class _AnimeCardState extends State<AnimeCard> {
                           ),
                         ),
                       ),
-                    if (widget.anime.episodes > 0)
+                    if (widget.isNew && _airCountdown.isEmpty)
+                      Positioned(
+                        top: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: NipahColors.gold,
+                          ),
+                          child: Text(
+                            'NEW',
+                            style: TextStyle(
+                              color: NipahColors.bg,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.08,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (widget.anime.episodes > 0 && _airCountdown.isEmpty)
                       Positioned(
                         top: 6,
                         left: widget.isNew ? 42 : 6,

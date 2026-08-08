@@ -767,6 +767,19 @@ class _DramaCard extends StatelessWidget {
                       child: Icon(Icons.tv, color: NipahColors.textDim),
                     ),
                   ),
+                  if (drama.status.isNotEmpty && drama.status.toLowerCase() != 'completed')
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        color: NipahColors.success,
+                        child: Text(
+                          'ONGOING',
+                          style: NipahTheme.label(size: 8, color: NipahColors.bg),
+                        ),
+                      ),
+                    ),
                   if (drama.episodes > 0)
                     Positioned(
                       top: 0,
@@ -777,19 +790,6 @@ class _DramaCard extends StatelessWidget {
                         child: Text(
                           'EP ${drama.episodes}',
                           style: NipahTheme.label(size: 9, color: NipahColors.gold),
-                        ),
-                      ),
-                    ),
-                  if (drama.status.isNotEmpty && drama.status.toLowerCase() != 'completed')
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        color: NipahColors.success,
-                        child: Text(
-                          drama.status,
-                          style: NipahTheme.label(size: 8, color: NipahColors.bg),
                         ),
                       ),
                     ),

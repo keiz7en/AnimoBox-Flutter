@@ -1,47 +1,15 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import '../api.dart';
 import '../drama_api.dart';
 import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'settings.dart';
-
-const String _kHlsHtmlTop = '''<!DOCTYPE html>
-<html><head>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<style>*{margin:0;padding:0}body{background:#000;overflow:hidden}video{width:100vw;height:100vh;object-fit:contain}</style>
-</head><body>
-<video id="v" playsinline></video>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
-<script>
-var p=document.getElementById('v'),h;
-var VIDEO_URL="__URL__";
-function startPlay(){
-  if(typeof Hls==='undefined'){setTimeout(startPlay,200);return}
-  if(Hls.isSupported()){
-    h=new Hls({maxBufferLength:30});
-    h.loadSource(VIDEO_URL);h.attachMedia(p);
-    h.on(Hls.Events.MANIFEST_PARSED,function(){p.play().catch(function(){})});
-    h.on(Hls.Events.ERROR,function(e,d){if(d.fatal)msg('err')});
-  }else if(p.canPlayType('application/vnd.apple.mpegurl')){
-    p.src=VIDEO_URL;p.play().catch(function(){});
-  }else{msg('err')}
-}
-function msg(m){try{FlutterBridge.postMessage(m)}catch(e){}}
-p.addEventListener('timeupdate',function(){msg('t:'+p.currentTime+':'+p.duration)});
-p.addEventListener('playing',function(){msg('play')});
-p.addEventListener('pause',function(){msg('pause')});
-p.addEventListener('ended',function(){msg('end')});
-p.addEventListener('error',function(){msg('err')});
-startPlay();
-</script></body></html>''';
 
 class DramaWatchPage extends StatefulWidget {
   final String title;
@@ -87,13 +55,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   int _trySourceIndex = 0;
   int _tryLinkIndex = 0;
   bool _isRetrying = false;
-
-  bool _useWebView = true;
-  WebViewController? _webViewController;
-  bool _webViewPlaying = false;
-  Timer? _switchTimer;
-  int _switchSeconds = 30;
-  String _playerEngineLabel = 'WebView';
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
@@ -167,7 +128,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   void dispose() {
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
-    _switchTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
     WakelockPlus.disable();
@@ -215,38 +175,25 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     final target = _savedPosition;
     _savedPosition = Duration.zero;
     _startPositionSaveTimer();
-    if (_useWebView) {
-      _webViewController?.runJavaScript('jsplay()');
-      if (target.inSeconds > 0) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _webViewController?.runJavaScript('jsseek(${target.inSeconds})');
-        });
-      }
-    } else {
-      _player.play();
-      if (target.inSeconds > 0) {
-        StreamSubscription? sub;
-        sub = _player.stream.position.listen((_) {
-          if (mounted) {
-            _player.seek(target);
-            sub?.cancel();
-          }
-        });
-        Future.delayed(const Duration(seconds: 10), () {
-          if (mounted) sub?.cancel();
-        });
-      }
+    _player.play();
+    if (target.inSeconds > 0) {
+      StreamSubscription? sub;
+      sub = _player.stream.position.listen((_) {
+        if (mounted) {
+          _player.seek(target);
+          sub?.cancel();
+        }
+      });
+      Future.delayed(const Duration(seconds: 10), () {
+        if (mounted) sub?.cancel();
+      });
     }
   }
 
   void _startFromBeginning() {
     clearPlaybackPosition(_positionKey);
     setState(() => _showResumeDialog = false);
-    if (_useWebView) {
-      _webViewController?.runJavaScript('jsplay()');
-    } else {
-      _player.play();
-    }
+    _player.play();
     _startPositionSaveTimer();
   }
 
@@ -270,32 +217,20 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   }
 
   void _togglePlayPause() {
-    if (_useWebView) {
-      _webViewController?.runJavaScript(_isPlaying ? 'jspause()' : 'jsplay()');
-    } else {
-      _player.playOrPause();
-    }
+    _player.playOrPause();
     _showControlsBriefly();
   }
 
   void _seekForward() {
     final newPos = _position + const Duration(seconds: 10);
-    if (_useWebView) {
-      _webViewController?.runJavaScript('jsseek(${newPos.inSeconds})');
-    } else {
-      _player.seek(newPos);
-    }
+    _player.seek(newPos);
     _showControlsBriefly();
   }
 
   void _seekBackward() {
     final newPos = _position - const Duration(seconds: 10);
     final safe = newPos < Duration.zero ? Duration.zero : newPos;
-    if (_useWebView) {
-      _webViewController?.runJavaScript('jsseek(${safe.inSeconds})');
-    } else {
-      _player.seek(safe);
-    }
+    _player.seek(safe);
     _showControlsBriefly();
   }
 
@@ -306,95 +241,11 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     return 0;
   }
 
-  void _startSwitchTimer() {
-    _switchTimer?.cancel();
-    _switchSeconds = 30;
-    _switchTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) { timer.cancel(); return; }
-      if (_isPlaying || _webViewPlaying) {
-        timer.cancel();
-        return;
-      }
-      if (_switchSeconds > 0) {
-        setState(() => _switchSeconds--);
-      } else {
-        timer.cancel();
-        _switchToOtherEngine();
-      }
-    });
-  }
-
-  void _switchToOtherEngine() {
-    _switchTimer?.cancel();
-    if (_useWebView) {
-      _useWebView = false;
-      _playerEngineLabel = 'MediaKit';
-      _switchSeconds = 30;
-      setState(() {});
-      _trySourceIndex = 0;
-      _tryNextSource();
-      _startSwitchTimer();
-    } else {
-      _useWebView = true;
-      _playerEngineLabel = 'WebView';
-      _switchSeconds = 30;
-      setState(() {});
-      _tryWebViewSource();
-      _startSwitchTimer();
-    }
-  }
-
-  void _onWebViewMessage(JavaScriptMessage message) {
-    final msg = message.message;
-    if (!mounted) return;
-    if (msg == 'play') {
-      _webViewPlaying = true;
-      _switchTimer?.cancel();
-      setState(() {
-        _isPlaying = true;
-        _isInitializing = false;
-        _showControls = true;
-      });
-      _startPositionSaveTimer();
-      _resetHideTimer();
-      _saveWatchHistory();
-    } else if (msg == 'pause') {
-      setState(() => _isPlaying = false);
-    } else if (msg == 'end') {
-      clearPlaybackPosition(_positionKey);
-    } else if (msg == 'err') {
-      debugPrint('DramaWatch: WebView HLS error');
-      if (!_webViewPlaying && !_isPlaying) {
-        _switchToOtherEngine();
-      }
-    } else if (msg.startsWith('t:')) {
-      final parts = msg.substring(2).split(':');
-      if (parts.length == 2) {
-        final pos = double.tryParse(parts[0]) ?? 0;
-        final dur = double.tryParse(parts[1]) ?? 0;
-        setState(() {
-          _position = Duration(milliseconds: (pos * 1000).toInt());
-          _duration = Duration(milliseconds: (dur * 1000).toInt());
-        });
-        if (_isPlaying && pos > 2) {
-          _lastSavedPosition = _position;
-          if (pos.toInt() % 5 == 0 && dur > 5) {
-            savePlaybackPosition(_positionKey, _position, _duration);
-          }
-        }
-      }
-    }
-  }
-
   Future<void> _loadStream() async {
     setState(() {
       _isInitializing = true;
       _hasError = false;
       _historySaved = false;
-      _webViewPlaying = false;
-      _useWebView = true;
-      _playerEngineLabel = 'WebView';
-      _switchSeconds = 30;
     });
 
     try {
@@ -417,8 +268,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       _selectedSourceIndex = 0;
       _selectedLinkIndex = _tryLinkIndex;
 
-      _tryWebViewSource();
-      _startSwitchTimer();
+      _tryNextSource();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -428,40 +278,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         });
       }
     }
-  }
-
-  Future<void> _tryWebViewSource() async {
-    if (_trySourceIndex >= _sources.length) {
-      _switchToOtherEngine();
-      return;
-    }
-    final source = _sources[_trySourceIndex];
-    _tryLinkIndex = _findEpisodeLink(source);
-    if (_tryLinkIndex >= source.links.length) {
-      _trySourceIndex++;
-      _tryWebViewSource();
-      return;
-    }
-    final url = source.links[_tryLinkIndex].url;
-    if (url.isEmpty) {
-      _trySourceIndex++;
-      _tryWebViewSource();
-      return;
-    }
-
-    final html = _kHlsHtmlTop.replaceAll('__URL__', url.replaceAll('\\', '\\\\').replaceAll("'", "\\'"));
-    _webViewController = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..addJavaScriptChannel('FlutterBridge', onMessageReceived: _onWebViewMessage)
-      ..setNavigationDelegate(NavigationDelegate(
-        onWebResourceError: (_) {
-          debugPrint('DramaWatch: WebView resource error, switching');
-          if (!_webViewPlaying && !_isPlaying) _switchToOtherEngine();
-        },
-      ))
-      ..loadHtmlString(html);
-
-    setState(() {});
   }
 
   void _tryNextSource() {
@@ -522,7 +338,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
         }
         _startPositionSaveTimer();
       }
-      _switchTimer?.cancel();
       _resetHideTimer();
       _saveWatchHistory();
     } catch (e) {
@@ -559,12 +374,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _selectedSourceIndex = sourceIndex;
     _selectedLinkIndex = _findEpisodeLink(_sources[sourceIndex]);
     final url = _sources[sourceIndex].links[_selectedLinkIndex].url;
-    if (_useWebView) {
-      final escapedUrl = url.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\$', '\\\$');
-      _webViewController?.runJavaScript('init("$escapedUrl")');
-    } else {
-      _initializeMediaKit(url);
-    }
+    _initializeMediaKit(url);
   }
 
   void _showServerSelector() {
@@ -605,34 +415,23 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          if (_useWebView && _webViewController != null)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: _toggleControls,
-                child: WebViewWidget(controller: _webViewController!),
-              ),
-            )
-          else if (!_useWebView)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: _toggleControls,
-                child: Video(controller: _videoController, controls: NoVideoControls),
-              ),
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _toggleControls,
+              child: Video(controller: _videoController, controls: NoVideoControls),
             ),
+          ),
 
           if (_isInitializing)
             Positioned.fill(
               child: Container(
                 color: Colors.black,
-                child: Center(
+                child: const Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const NipahLoader(size: 28),
-                      const SizedBox(height: 16),
-                      Text('Trying $_playerEngineLabel...', style: NipahTheme.body(size: 13, color: NipahColors.textSoft)),
-                      const SizedBox(height: 8),
-                      Text('Switching in ${_switchSeconds}s', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
+                      NipahLoader(size: 28),
+                      SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -804,12 +603,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                     value: _duration.inMilliseconds > 0 ? _position.inMilliseconds.toDouble().clamp(0.0, _duration.inMilliseconds.toDouble()) : 0.0,
                     max: _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
                     onChanged: (value) {
-                      final seekTo = Duration(milliseconds: value.toInt());
-                      if (_useWebView) {
-                        _webViewController?.runJavaScript('jsseek(${seekTo.inSeconds})');
-                      } else {
-                        _player.seek(seekTo);
-                      }
+                      _player.seek(Duration(milliseconds: value.toInt()));
                       _showControlsBriefly();
                     },
                   ),

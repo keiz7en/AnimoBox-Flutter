@@ -1,46 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'settings.dart';
-
-const String _kHlsHtmlTop = '''<!DOCTYPE html>
-<html><head>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<style>*{margin:0;padding:0}body{background:#000;overflow:hidden}video{width:100vw;height:100vh;object-fit:contain}</style>
-</head><body>
-<video id="v" playsinline></video>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
-<script>
-var p=document.getElementById('v'),h;
-var VIDEO_URL="__URL__";
-function startPlay(){
-  if(typeof Hls==='undefined'){setTimeout(startPlay,200);return}
-  if(Hls.isSupported()){
-    h=new Hls({maxBufferLength:30});
-    h.loadSource(VIDEO_URL);h.attachMedia(p);
-    h.on(Hls.Events.MANIFEST_PARSED,function(){p.play().catch(function(){})});
-    h.on(Hls.Events.ERROR,function(e,d){if(d.fatal)msg('err')});
-  }else if(p.canPlayType('application/vnd.apple.mpegurl')){
-    p.src=VIDEO_URL;p.play().catch(function(){});
-  }else{msg('err')}
-}
-function msg(m){try{FlutterBridge.postMessage(m)}catch(e){}}
-p.addEventListener('timeupdate',function(){msg('t:'+p.currentTime+':'+p.duration)});
-p.addEventListener('playing',function(){msg('play')});
-p.addEventListener('pause',function(){msg('pause')});
-p.addEventListener('ended',function(){msg('end')});
-p.addEventListener('error',function(){msg('err')});
-startPlay();
-</script></body></html>''';
 
 class WatchPage extends StatefulWidget {
   final String animeTitle;
@@ -82,11 +50,6 @@ class _WatchPageState extends State<WatchPage> {
   int _tryLinkIndex = 0;
   bool _isRetrying = false;
 
-  bool _useWebView = false;
-  WebViewController? _webViewController;
-  bool _webViewPlaying = false;
-  Timer? _switchTimer;
-  int _switchSeconds = 30;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
@@ -118,15 +81,22 @@ class _WatchPageState extends State<WatchPage> {
     });
 
     _player.stream.position.listen((position) {
-      if (mounted && _isPlaying && position.inSeconds > 2) {
-        _lastSavedPosition = position;
-        if (position.inSeconds % 5 == 0) {
-          final dur = _player.state.duration;
-          if (dur.inSeconds > 5) {
-            savePlaybackPosition(_positionKey, position, dur);
+      if (mounted) {
+        setState(() => _position = position);
+        if (_isPlaying && position.inSeconds > 2) {
+          _lastSavedPosition = position;
+          if (position.inSeconds % 5 == 0) {
+            final dur = _player.state.duration;
+            if (dur.inSeconds > 5) {
+              savePlaybackPosition(_positionKey, position, dur);
+            }
           }
         }
       }
+    });
+
+    _player.stream.duration.listen((d) {
+      if (mounted) setState(() => _duration = d);
     });
 
     _player.stream.completed.listen((completed) {
@@ -176,7 +146,6 @@ class _WatchPageState extends State<WatchPage> {
   void dispose() {
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
-    _switchTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
     WakelockPlus.disable();
@@ -294,8 +263,6 @@ class _WatchPageState extends State<WatchPage> {
       _isInitializing = true;
       _hasError = false;
       _historySaved = false;
-      _useWebView = false;
-      _webViewPlaying = false;
     });
 
     final titleVariants = widget.anime?.allTitles;
@@ -325,7 +292,6 @@ class _WatchPageState extends State<WatchPage> {
       _selectedSourceIndex = 0;
       _selectedLinkIndex = _tryLinkIndex;
       _tryNextSource();
-      _startSwitchTimer();
     } catch (e) {
       setState(() {
         _isInitializing = false;
@@ -389,7 +355,6 @@ class _WatchPageState extends State<WatchPage> {
       }
       _resetHideTimer();
       _saveWatchHistory();
-      _switchTimer?.cancel();
     } catch (e) {
       debugPrint('WatchPage: Failed to open $url - $e');
       _trySourceIndex++;
@@ -411,34 +376,20 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   void _togglePlayPause() {
-    if (_useWebView) {
-      _webViewController?.runJavaScript(_isPlaying ? 'jspause()' : 'jsplay()');
-    } else {
-      _player.playOrPause();
-    }
+    _player.playOrPause();
     _showControlsBriefly();
   }
 
   void _seekForward() {
-    final pos = _useWebView ? _position : _player.state.position;
-    final newPos = pos + const Duration(seconds: 10);
-    if (_useWebView) {
-      _webViewController?.runJavaScript('jsseek(${newPos.inSeconds})');
-    } else {
-      _player.seek(newPos);
-    }
+    final newPos = _position + const Duration(seconds: 10);
+    _player.seek(newPos);
     _showControlsBriefly();
   }
 
   void _seekBackward() {
-    final pos = _useWebView ? _position : _player.state.position;
-    final newPos = pos - const Duration(seconds: 10);
+    final newPos = _position - const Duration(seconds: 10);
     final safe = newPos < Duration.zero ? Duration.zero : newPos;
-    if (_useWebView) {
-      _webViewController?.runJavaScript('jsseek(${safe.inSeconds})');
-    } else {
-      _player.seek(safe);
-    }
+    _player.seek(safe);
     _showControlsBriefly();
   }
 
@@ -605,106 +556,6 @@ class _WatchPageState extends State<WatchPage> {
     return 0;
   }
 
-  void _startSwitchTimer() {
-    _switchTimer?.cancel();
-    _switchSeconds = 30;
-    _switchTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) { timer.cancel(); return; }
-      if (_isPlaying || _webViewPlaying) { timer.cancel(); return; }
-      if (_switchSeconds > 0) {
-        setState(() => _switchSeconds--);
-      } else {
-        timer.cancel();
-        _switchToWebView();
-      }
-    });
-  }
-
-  void _switchToWebView() {
-    _switchTimer?.cancel();
-    if (_useWebView || _trySourceIndex >= _sources.length) {
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _hasError = true;
-          _errorMessage = 'All servers unavailable. Try again later.';
-        });
-      }
-      return;
-    }
-    _useWebView = true;
-    setState(() {});
-    final source = _sources[_trySourceIndex];
-    final linkIdx = _selectBestLink(source);
-    if (linkIdx >= source.links.length) {
-      _trySourceIndex++;
-      _switchToWebView();
-      return;
-    }
-    final url = source.links[linkIdx].url;
-    if (url.isEmpty) {
-      _trySourceIndex++;
-      _switchToWebView();
-      return;
-    }
-    final html = _kHlsHtmlTop.replaceAll('__URL__', url.replaceAll('\\', '\\\\').replaceAll("'", "\\'"));
-    _webViewController = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..addJavaScriptChannel('FlutterBridge', onMessageReceived: _onWebViewMessage)
-      ..setNavigationDelegate(NavigationDelegate(
-        onWebResourceError: (_) {
-          if (!_webViewPlaying && !_isPlaying) {
-            _trySourceIndex++;
-            _switchToWebView();
-          }
-        },
-      ))
-      ..loadHtmlString(html);
-    setState(() {});
-  }
-
-  void _onWebViewMessage(JavaScriptMessage message) {
-    final msg = message.message;
-    if (!mounted) return;
-    if (msg == 'play') {
-      _webViewPlaying = true;
-      _switchTimer?.cancel();
-      setState(() {
-        _isPlaying = true;
-        _isInitializing = false;
-        _showControls = true;
-      });
-      _startPositionSaveTimer();
-      _resetHideTimer();
-      _saveWatchHistory();
-    } else if (msg == 'pause') {
-      setState(() => _isPlaying = false);
-    } else if (msg == 'end') {
-      clearPlaybackPosition(_positionKey);
-    } else if (msg == 'err') {
-      if (!_webViewPlaying && !_isPlaying) {
-        _trySourceIndex++;
-        _switchToWebView();
-      }
-    } else if (msg.startsWith('t:')) {
-      final parts = msg.substring(2).split(':');
-      if (parts.length == 2) {
-        final pos = double.tryParse(parts[0]) ?? 0;
-        final dur = double.tryParse(parts[1]) ?? 0;
-        setState(() {
-          _position = Duration(milliseconds: (pos * 1000).toInt());
-          _duration = Duration(milliseconds: (dur * 1000).toInt());
-        });
-        if (_isPlaying && pos > 2) {
-          _lastSavedPosition = _position;
-          if (pos.toInt() % 5 == 0 && dur > 5) {
-            savePlaybackPosition(_positionKey, _position, _duration);
-          }
-        }
-      }
-    }
-  }
-
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final h = duration.inHours;
@@ -818,11 +669,6 @@ class _WatchPageState extends State<WatchPage> {
             '${L10n.t('loading')} ${L10n.t('episode')} $_currentEpisode...',
             style: NipahTheme.body(color: NipahColors.textSoft),
           ),
-          const SizedBox(height: 8),
-          Text(
-            _useWebView ? 'Trying WebView... Switching in ${_switchSeconds}s' : 'Trying MediaKit... Switching in ${_switchSeconds}s',
-            style: NipahTheme.body(size: 12, color: NipahColors.textDim),
-          ),
         ],
       );
     }
@@ -861,9 +707,6 @@ class _WatchPageState extends State<WatchPage> {
           ],
         ),
       );
-    }
-    if (_useWebView && _webViewController != null) {
-      return WebViewWidget(controller: _webViewController!);
     }
     return Video(
       controller: _videoController,
@@ -997,9 +840,6 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   Widget _buildBottomBar() {
-    final position = _player.state.position;
-    final duration = _player.state.duration;
-
     return SafeArea(
       child: GestureDetector(
         onTap: () {},
@@ -1017,17 +857,13 @@ class _WatchPageState extends State<WatchPage> {
                   overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
                 ),
                 child: Slider(
-                  value: duration.inMilliseconds > 0
-                      ? position.inMilliseconds.toDouble().clamp(0.0, duration.inMilliseconds.toDouble())
+                  value: _duration.inMilliseconds > 0
+                      ? _position.inMilliseconds.toDouble().clamp(0.0, _duration.inMilliseconds.toDouble())
                       : 0.0,
-                  max: duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0,
+                  max: _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
                   onChanged: (value) {
                     final seekTo = Duration(milliseconds: value.toInt());
-                    if (_useWebView) {
-                      _webViewController?.runJavaScript('jsseek(${seekTo.inSeconds})');
-                    } else {
-                      _player.seek(seekTo);
-                    }
+                    _player.seek(seekTo);
                     _showControlsBriefly();
                   },
                 ),
@@ -1035,7 +871,7 @@ class _WatchPageState extends State<WatchPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(_formatDuration(position), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  Text(_formatDuration(_position), style: const TextStyle(color: Colors.white, fontSize: 12)),
                   Row(
                     children: [
                       IconButton(
@@ -1052,7 +888,7 @@ class _WatchPageState extends State<WatchPage> {
                       ),
                     ],
                   ),
-                  Text(_formatDuration(duration), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  Text(_formatDuration(_duration), style: const TextStyle(color: Colors.white, fontSize: 12)),
                 ],
               ),
             ],
