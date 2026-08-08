@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../api.dart';
 import '../drama_api.dart';
@@ -11,78 +10,6 @@ import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'settings.dart';
-
-const String _dramaUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-
-class _VlcPlayerWidget extends StatefulWidget {
-  final String url;
-  final String userAgent;
-  final String referer;
-  final VoidCallback? onInitialized;
-  final void Function(VlcPlayerController controller)? onControllerReady;
-  const _VlcPlayerWidget({
-    super.key,
-    required this.url,
-    this.userAgent = '',
-    this.referer = '',
-    this.onInitialized,
-    this.onControllerReady,
-  });
-  @override
-  State<_VlcPlayerWidget> createState() => _VlcPlayerWidgetState();
-}
-
-class _VlcPlayerWidgetState extends State<_VlcPlayerWidget> {
-  late final VlcPlayerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    final opts = <String>[
-      VlcHttpOptions.httpReconnect(true),
-      VlcHttpOptions.httpContinuous(true),
-    ];
-    if (widget.userAgent.isNotEmpty) {
-      opts.add(VlcHttpOptions.httpUserAgent(widget.userAgent));
-    }
-    if (widget.referer.isNotEmpty) {
-      opts.add(VlcHttpOptions.httpReferrer(widget.referer));
-    }
-
-    _controller = VlcPlayerController.network(
-      widget.url,
-      hwAcc: HwAcc.disabled,
-      autoPlay: true,
-      options: VlcPlayerOptions(
-        http: VlcHttpOptions(opts),
-        advanced: VlcAdvancedOptions([
-          VlcAdvancedOptions.networkCaching(5000),
-        ]),
-      ),
-    );
-
-    _controller.addOnInitListener(() {
-      widget.onControllerReady?.call(_controller);
-      widget.onInitialized?.call();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.stopRendererScanning();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return VlcPlayer(
-      controller: _controller,
-      aspectRatio: MediaQuery.of(context).size.aspectRatio,
-      placeholder: const Center(child: NipahLoader(size: 28)),
-    );
-  }
-}
 
 class DramaWatchPage extends StatefulWidget {
   final String title;
@@ -107,9 +34,6 @@ class DramaWatchPage extends StatefulWidget {
 class _DramaWatchPageState extends State<DramaWatchPage> {
   late final Player _player;
   late final VideoController _videoController;
-  VlcPlayerController? _vlcController;
-  bool _useVlc = false;
-  bool _vlcError = false;
   bool _isInitializing = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -127,14 +51,8 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   List<StreamSource> _sources = [];
   int _selectedSourceIndex = 0;
   int _selectedLinkIndex = 0;
-  int _trySourceIndex = 0;
-  int _tryLinkIndex = 0;
-  String? _vlcUrl;
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
-
-  int _mkErrorCount = 0;
-  final List<StreamSubscription> _subscriptions = [];
 
   @override
   void initState() {
@@ -146,18 +64,12 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     WakelockPlus.enable();
     _applyAutoRotate();
 
-    _subscriptions.add(_player.stream.playing.listen((playing) {
-      if (mounted && !_useVlc) {
-        setState(() => _isPlaying = playing);
-        if (playing) {
-          _mkErrorCount = 0;
-          _vlcFallbackTimer?.cancel();
-        }
-      }
-    }));
+    _player.stream.playing.listen((playing) {
+      if (mounted) setState(() => _isPlaying = playing);
+    });
 
-    _subscriptions.add(_player.stream.position.listen((position) {
-      if (mounted && !_useVlc) {
+    _player.stream.position.listen((position) {
+      if (mounted) {
         setState(() => _position = position);
         if (_isPlaying && position.inSeconds > 2) {
           _lastSavedPosition = position;
@@ -169,33 +81,31 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           }
         }
       }
-    }));
+    });
 
-    _subscriptions.add(_player.stream.duration.listen((duration) {
-      if (mounted && !_useVlc) setState(() => _duration = duration);
-    }));
+    _player.stream.duration.listen((duration) {
+      if (mounted) setState(() => _duration = duration);
+    });
 
-    _subscriptions.add(_player.stream.completed.listen((completed) {
+    _player.stream.completed.listen((completed) {
       if (completed && mounted) {
         clearPlaybackPosition(_positionKey);
       }
-    }));
+    });
 
-    _subscriptions.add(_player.stream.error.listen((error) {
-      if (mounted && error.isNotEmpty && !_useVlc) {
-        _mkErrorCount++;
-        debugPrint('DramaWatch: MK stream error (count=$_mkErrorCount): $error');
-        if (_mkErrorCount >= 3) {
-          _vlcFallbackTimer?.cancel();
-          debugPrint('DramaWatch: 3+ errors, switching to VLC');
-          _useVlc = true;
-          final url = _sources.isNotEmpty && _selectedSourceIndex < _sources.length
-              ? _sources[_selectedSourceIndex].links[_selectedLinkIndex].url
-              : '';
-          if (url.isNotEmpty) _initVlcPlayer(url);
-        }
+    _player.stream.error.listen((error) {
+      if (mounted && error.isNotEmpty && !_isRetrying) {
+        _isRetrying = true;
+        debugPrint('DramaWatch: Player error: $error - trying next source');
+        _trySourceIndex++;
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _isRetrying = false;
+            _tryNextSource();
+          }
+        });
       }
-    }));
+    });
 
     _init();
   }
@@ -220,17 +130,10 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
 
   @override
   void dispose() {
-    for (final sub in _subscriptions) {
-      sub.cancel();
-    }
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
-    _vlcFallbackTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
-    _vlcController?.removeListener(_vlcListener);
-    _vlcController?.stopRendererScanning();
-    _vlcController?.dispose();
     WakelockPlus.disable();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -256,15 +159,8 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   }
 
   void _saveCurrentPosition() {
-    Duration pos;
-    Duration dur;
-    if (_useVlc && _vlcController != null) {
-      pos = _vlcController!.value.position;
-      dur = _vlcController!.value.duration;
-    } else {
-      pos = _player.state.position;
-      dur = _player.state.duration;
-    }
+    final pos = _player.state.position;
+    final dur = _player.state.duration;
     final savePos = pos.inSeconds > 2 ? pos : _lastSavedPosition;
     if (savePos.inSeconds > 2 && dur.inSeconds > 5) {
       savePlaybackPosition(_positionKey, savePos, dur);
@@ -283,38 +179,25 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     final target = _savedPosition;
     _savedPosition = Duration.zero;
     _startPositionSaveTimer();
-    if (_useVlc) {
-      _vlcController?.play();
-      if (target.inSeconds > 0) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _vlcController?.seekTo(target);
-        });
-      }
-    } else {
-      _player.play();
-      if (target.inSeconds > 0) {
-        StreamSubscription? sub;
-        sub = _player.stream.position.listen((_) {
-          if (mounted) {
-            _player.seek(target);
-            sub?.cancel();
-          }
-        });
-        Future.delayed(const Duration(seconds: 10), () {
-          if (mounted) sub?.cancel();
-        });
-      }
+    _player.play();
+    if (target.inSeconds > 0) {
+      StreamSubscription? sub;
+      sub = _player.stream.position.listen((_) {
+        if (mounted) {
+          _player.seek(target);
+          sub?.cancel();
+        }
+      });
+      Future.delayed(const Duration(seconds: 10), () {
+        if (mounted) sub?.cancel();
+      });
     }
   }
 
   void _startFromBeginning() {
     clearPlaybackPosition(_positionKey);
     setState(() => _showResumeDialog = false);
-    if (_useVlc) {
-      _vlcController?.play();
-    } else {
-      _player.play();
-    }
+    _player.play();
     _startPositionSaveTimer();
   }
 
@@ -338,56 +221,37 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   }
 
   void _togglePlayPause() {
-    if (_useVlc) {
-      final v = _vlcController?.value;
-      if (v != null && v.isPlaying) {
-        _vlcController?.pause();
-      } else {
-        _vlcController?.play();
-      }
-    } else {
-      _player.playOrPause();
-    }
+    _player.playOrPause();
     _showControlsBriefly();
   }
 
   void _seekForward() {
-    final newPos = _position + const Duration(seconds: 10);
-    if (_useVlc) {
-      _vlcController?.seekTo(newPos);
-    } else {
-      _player.seek(newPos);
-    }
+    _player.seek(_position + const Duration(seconds: 10));
     _showControlsBriefly();
   }
 
   void _seekBackward() {
     final newPos = _position - const Duration(seconds: 10);
-    final target = newPos < Duration.zero ? Duration.zero : newPos;
-    if (_useVlc) {
-      _vlcController?.seekTo(target);
-    } else {
-      _player.seek(target);
-    }
+    _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
     _showControlsBriefly();
   }
 
   int _findEpisodeLink(StreamSource source) {
-    if (source.links.isEmpty) return -1;
     for (int i = 0; i < source.links.length; i++) {
       if (source.links[i].quality.contains('$_currentEpisode')) return i;
     }
     return 0;
   }
 
+  int _trySourceIndex = 0;
+  int _tryLinkIndex = 0;
+  bool _isRetrying = false;
+
   Future<void> _loadStream() async {
-    _vlcFallbackTimer?.cancel();
     setState(() {
       _isInitializing = true;
       _hasError = false;
       _historySaved = false;
-      _useVlc = false;
-      _vlcError = false;
     });
 
     try {
@@ -421,11 +285,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
 
   void _tryNextSource() {
     if (_trySourceIndex >= _sources.length) {
-      if (!_useVlc) {
-        debugPrint('DramaWatch: All MK sources failed, trying VLC fallback');
-        _tryVlcFallback();
-        return;
-      }
       if (mounted) {
         setState(() {
           _isInitializing = false;
@@ -437,7 +296,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     }
     final source = _sources[_trySourceIndex];
     _tryLinkIndex = _findEpisodeLink(source);
-    if (_tryLinkIndex < 0 || _tryLinkIndex >= source.links.length) {
+    if (_tryLinkIndex >= source.links.length) {
       _trySourceIndex++;
       _tryNextSource();
       return;
@@ -447,145 +306,64 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     _initializePlayerWithRetry(source.links[_tryLinkIndex].url);
   }
 
-  Timer? _vlcFallbackTimer;
-
   Future<void> _initializePlayerWithRetry(String url) async {
-    _vlcFallbackTimer?.cancel();
     try {
       await _player.stop();
-      final headers = <String, String>{'User-Agent': _dramaUA};
+      final headers = <String, String>{
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      };
       if (url.contains('.m3u8')) {
         headers['Referer'] = 'https://kissasian.dev/';
       }
       await _player.open(Media(url, httpHeaders: headers));
-      _saveWatchHistory();
-      if (_showResumeDialog) {
-        await _player.pause();
-        if (mounted) setState(() { _isInitializing = false; _isPlaying = false; _showControls = true; });
-      } else {
-        if (mounted) setState(() { _isInitializing = false; _isPlaying = true; _showControls = true; });
-        _startPositionSaveTimer();
-      }
-      _resetHideTimer();
-      if (!_useVlc) _startVlcFallbackTimer(url);
     } catch (e) {
-      debugPrint('DramaWatch: MK failed to open $url - $e');
-      if (!_useVlc) {
-        _useVlc = true;
-        _initVlcPlayer(url);
-      } else {
-        _trySourceIndex++;
-        _tryNextSource();
-      }
+      debugPrint('DramaWatch: Failed to open $url - $e');
+      _trySourceIndex++;
+      _tryNextSource();
     }
   }
 
-  void _startVlcFallbackTimer(String url) {
-    _vlcFallbackTimer?.cancel();
-    _vlcFallbackTimer = Timer(const Duration(seconds: 4), () {
-      if (!mounted || _useVlc) return;
-      final pos = _player.state.position;
-      final dur = _player.state.duration;
-      if (pos.inSeconds < 2 && dur.inSeconds < 2) {
-        debugPrint('DramaWatch: MK no progress after 4s, switching to VLC');
-        _useVlc = true;
-        _initVlcPlayer(url);
+  Future<void> _initializePlayer(String url) async {
+    try {
+      await _player.stop();
+      debugPrint('DramaWatch: Playing URL: $url');
+      final headers = <String, String>{
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      };
+      if (url.contains('.m3u8')) {
+        headers['Referer'] = 'https://kissasian.dev/';
       }
-    });
-  }
+      await _player.open(
+        Media(url, httpHeaders: headers),
+      );
 
-  void _tryVlcFallback() {
-    if (_sources.isEmpty) {
+      if (_showResumeDialog) {
+        await _player.pause();
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isPlaying = false;
+            _showControls = true;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+            _isPlaying = true;
+            _showControls = true;
+          });
+        }
+        _startPositionSaveTimer();
+      }
+      _resetHideTimer();
+      _saveWatchHistory();
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isInitializing = false;
           _hasError = true;
-          _errorMessage = 'No servers available for VLC fallback.';
-        });
-      }
-      return;
-    }
-    _useVlc = true;
-    _trySourceIndex = 0;
-    _tryLinkIndex = _findEpisodeLink(_sources.first);
-    _selectedSourceIndex = 0;
-    if (_tryLinkIndex >= _sources.first.links.length) {
-      _trySourceIndex++;
-      _tryNextSource();
-      return;
-    }
-    final url = _sources.first.links[_tryLinkIndex].url;
-    if (url.isEmpty) {
-      _trySourceIndex++;
-      _tryNextSource();
-      return;
-    }
-    _initVlcPlayer(url);
-  }
-
-  void _initVlcPlayer(String url) {
-    _vlcController?.removeListener(_vlcListener);
-    _vlcController?.stopRendererScanning();
-    _vlcController?.dispose();
-    _vlcController = null;
-
-    setState(() {
-      _vlcUrl = url;
-      _isInitializing = false;
-      _showControls = true;
-    });
-    _resetHideTimer();
-    _saveWatchHistory();
-  }
-
-  void _onVlcReady(VlcPlayerController ctrl) {
-    _vlcController = ctrl;
-    ctrl.addListener(_vlcListener);
-    debugPrint('DramaWatch: VLC player ready');
-  }
-
-  void _vlcListener() {
-    if (!mounted || _vlcController == null) return;
-    final v = _vlcController!.value;
-
-    if (mounted) {
-      setState(() {
-        _isPlaying = v.isPlaying;
-        _position = v.position;
-        _duration = v.duration;
-      });
-    }
-
-    if (_isPlaying && _position.inSeconds > 2) {
-      _lastSavedPosition = _position;
-      if (_position.inSeconds % 5 == 0 && _duration.inSeconds > 5) {
-        savePlaybackPosition(_positionKey, _position, _duration);
-      }
-    }
-
-    if (v.isEnded && mounted) {
-      clearPlaybackPosition(_positionKey);
-    }
-
-    if (v.hasError && mounted && !_vlcError) {
-      _vlcError = true;
-      debugPrint('DramaWatch: VLC error: ${v.errorDescription}');
-      if (_trySourceIndex + 1 < _sources.length) {
-        _trySourceIndex++;
-        _vlcError = false;
-        final nextSource = _sources[_trySourceIndex];
-        final nextLinkIdx = _findEpisodeLink(nextSource);
-        if (nextLinkIdx >= 0 && nextLinkIdx < nextSource.links.length) {
-          _selectedSourceIndex = _trySourceIndex;
-          _selectedLinkIndex = nextLinkIdx;
-          _initVlcPlayer(nextSource.links[nextLinkIdx].url);
-        } else {
-          _vlcListener();
-        }
-      } else {
-        setState(() {
-          _hasError = true;
-          _errorMessage = 'All servers failed (VLC). Try again later.';
+          _errorMessage = 'Failed to load video: $e';
         });
       }
     }
@@ -609,26 +387,15 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
     final newEp = _currentEpisode + delta;
     if (newEp < 1 || newEp > widget.episodes.length) return;
     _saveCurrentPosition();
-    _positionSaveTimer?.cancel();
     setState(() => _currentEpisode = newEp);
     _loadStream();
   }
 
   void _switchServer(int sourceIndex) {
     if (sourceIndex < 0 || sourceIndex >= _sources.length) return;
-    final source = _sources[sourceIndex];
-    if (source.links.isEmpty) return;
-    _saveCurrentPosition();
     _selectedSourceIndex = sourceIndex;
-    _selectedLinkIndex = _findEpisodeLink(source);
-    if (_selectedLinkIndex < 0 || _selectedLinkIndex >= source.links.length) _selectedLinkIndex = 0;
-    final url = source.links[_selectedLinkIndex].url;
-    if (url.isEmpty) return;
-    setState(() {
-      _isInitializing = true;
-      _hasError = false;
-    });
-    _initializePlayerWithRetry(url);
+    _selectedLinkIndex = _findEpisodeLink(_sources[sourceIndex]);
+    _initializePlayer(_sources[sourceIndex].links[_selectedLinkIndex].url);
   }
 
   void _showServerSelector() {
@@ -679,8 +446,10 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           Positioned.fill(
             child: GestureDetector(
               onTap: _toggleControls,
-              behavior: HitTestBehavior.opaque,
-              child: _buildVideoWidget(),
+              child: Video(
+                controller: _videoController,
+                controls: NoVideoControls,
+              ),
             ),
           ),
           if (_isInitializing)
@@ -701,9 +470,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                       Icon(Icons.error_outline, color: NipahColors.danger, size: 48),
                       const SizedBox(height: 16),
                       Text(_errorMessage, style: NipahTheme.body(size: 14, color: NipahColors.textDim)),
-                      const SizedBox(height: 8),
-                      if (_useVlc)
-                        Text('VLC engine used', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
                       const SizedBox(height: 16),
                       GestureDetector(
                         onTap: _loadStream,
@@ -730,22 +496,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildVideoWidget() {
-    if (_useVlc && _vlcUrl != null) {
-      return _VlcPlayerWidget(
-        key: ValueKey(_vlcUrl),
-        url: _vlcUrl!,
-        userAgent: _dramaUA,
-        referer: 'https://kissasian.dev/',
-        onControllerReady: _onVlcReady,
-      );
-    }
-    return Video(
-      controller: _videoController,
-      controls: NoVideoControls,
     );
   }
 
@@ -842,22 +592,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(widget.title, style: NipahTheme.heading(size: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Row(
-                        children: [
-                          Text('Episode $_currentEpisode', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
-                          if (_useVlc) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: NipahColors.gold.withValues(alpha: 0.2),
-                                border: Border.all(color: NipahColors.gold.withValues(alpha: 0.4)),
-                              ),
-                              child: Text('VLC', style: NipahTheme.label(size: 8, color: NipahColors.gold)),
-                            ),
-                          ],
-                        ],
-                      ),
+                      Text('Episode $_currentEpisode', style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
                     ],
                   ),
                 ),
@@ -874,11 +609,11 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                 child: Container(
                   width: 48,
                   height: 48,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: Colors.black45,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.replay_10, color: Colors.white, size: 32),
+                  child: Icon(Icons.replay_10, color: Colors.white, size: 32),
                 ),
               ),
               const SizedBox(width: 32),
@@ -913,11 +648,11 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                 child: Container(
                   width: 48,
                   height: 48,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: Colors.black45,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.forward_10, color: Colors.white, size: 32),
+                  child: Icon(Icons.forward_10, color: Colors.white, size: 32),
                 ),
               ),
             ],
@@ -953,12 +688,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                         : 0.0,
                     max: _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
                     onChanged: (value) {
-                      final target = Duration(milliseconds: value.toInt());
-                      if (_useVlc) {
-                        _vlcController?.seekTo(target);
-                      } else {
-                        _player.seek(target);
-                      }
+                      _player.seek(Duration(milliseconds: value.toInt()));
                       _showControlsBriefly();
                     },
                   ),
@@ -969,7 +699,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                     Text(_formatDuration(_position), style: NipahTheme.body(size: 11, color: NipahColors.textDim)),
                     Row(
                       children: [
-                        if (_sources.length > 1 && _selectedSourceIndex < _sources.length)
+                        if (_sources.length > 1)
                           GestureDetector(
                             onTap: _showServerSelector,
                             child: Container(
@@ -984,17 +714,17 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                               ),
                             ),
                           ),
-                        if (_sources.length > 1 && _selectedSourceIndex < _sources.length) const SizedBox(width: 12),
+                        if (_sources.length > 1) const SizedBox(width: 12),
                         if (_currentEpisode > 1)
                           GestureDetector(
                             onTap: () => _changeEpisode(-1),
-                            child: const Icon(Icons.skip_previous, color: Colors.white, size: 24),
+                            child: Icon(Icons.skip_previous, color: Colors.white, size: 24),
                           ),
                         if (_currentEpisode < widget.episodes.length) ...[
                           const SizedBox(width: 16),
                           GestureDetector(
                             onTap: () => _changeEpisode(1),
-                            child: const Icon(Icons.skip_next, color: Colors.white, size: 24),
+                            child: Icon(Icons.skip_next, color: Colors.white, size: 24),
                           ),
                         ],
                       ],

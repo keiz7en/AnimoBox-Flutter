@@ -48,6 +48,7 @@ class Anime {
 
     int? nextEp;
     int? airAt;
+    int? interval;
 
     final nextAiring = json['nextAiringEpisode'];
     if (nextAiring is Map<String, dynamic>) {
@@ -65,14 +66,14 @@ class Anime {
       description: (json['description'] ?? '').replaceAll(RegExp(r'<[^>]*>'), ''),
       format: (json['format'] ?? '').toString().replaceAll('_', ' '),
       status: json['status'] ?? '',
-      episodes: (json['episodes'] is int) ? json['episodes'] : 0,
-      duration: (json['duration'] is int) ? json['duration'] : 0,
-      score: (json['averageScore'] is num) ? json['averageScore'].toDouble() : 0.0,
+      episodes: json['episodes'] ?? 0,
+      duration: json['duration'] ?? 0,
+      score: (json['averageScore'] ?? 0).toDouble(),
       genres: List<String>.from(json['genres'] ?? []),
       season: json['season'] ?? '',
       nextAiringEpisode: nextEp,
       airingAt: airAt,
-      airingInterval: null,
+      airingInterval: interval,
       isAdult: json['isAdult'] ?? false,
       synonyms: List<String>.from(json['synonyms'] ?? []),
     );
@@ -138,19 +139,6 @@ class StreamSource {
   StreamSource({required this.server, required this.type, required this.links});
 }
 
-int _asInt(dynamic v, [int fallback = 0]) {
-  if (v == null) return fallback;
-  if (v is int) return v;
-  if (v is String) return int.tryParse(v) ?? fallback;
-  return fallback;
-}
-
-List<String> _asStringList(dynamic v) {
-  if (v == null) return [];
-  if (v is List) return v.map<String>((e) => e?.toString() ?? '').where((s) => s.isNotEmpty).toList();
-  return [];
-}
-
 class SearchResult {
   final String id;
   final String title;
@@ -192,19 +180,19 @@ class Drama {
 
   factory Drama.fromKissAsian(Map<String, dynamic> json) {
     return Drama(
-      id: _asInt(json['id']),
-      title: json['title']?.toString() ?? '',
-      slug: json['slug']?.toString() ?? '',
-      poster: json['poster']?.toString() ?? '',
-      backdrop: json['backdrop']?.toString() ?? '',
-      episodes: _asInt(json['episodes'] ?? json['serverEpisodesCount']),
-      country: json['country']?.toString() ?? '',
-      status: json['status']?.toString() ?? '',
-      rating: (json['rating'] is num) ? json['rating'].toDouble() : 0.0,
-      genres: _asStringList(json['genres']),
-      description: json['description']?.toString() ?? '',
-      duration: json['duration']?.toString() ?? '',
-      year: json['year']?.toString() ?? '',
+      id: json['id'] ?? 0,
+      title: json['title'] ?? '',
+      slug: json['slug'] ?? '',
+      poster: json['poster'] ?? '',
+      backdrop: json['backdrop'] ?? '',
+      episodes: json['episodes'] ?? json['serverEpisodesCount'] ?? 0,
+      country: json['country'] ?? '',
+      status: json['status'] ?? '',
+      rating: (json['rating'] ?? 0).toDouble(),
+      genres: List<String>.from(json['genres'] ?? []),
+      description: json['description'] ?? '',
+      duration: json['duration'] ?? '',
+      year: json['year'] ?? '',
     );
   }
 
@@ -234,20 +222,20 @@ class DramaDetail extends Drama {
 
   factory DramaDetail.fromKissAsian(Map<String, dynamic> json) {
     return DramaDetail(
-      id: _asInt(json['id']),
-      title: json['title']?.toString() ?? '',
-      slug: json['slug']?.toString() ?? '',
-      poster: json['poster']?.toString() ?? '',
-      backdrop: json['backdrop']?.toString() ?? '',
-      episodes: _asInt(json['episodes']),
-      country: json['country']?.toString() ?? '',
-      status: json['status']?.toString() ?? '',
-      rating: (json['rating'] is num) ? json['rating'].toDouble() : 0.0,
-      genres: _asStringList(json['genres']),
-      description: json['description']?.toString() ?? '',
-      duration: json['duration']?.toString() ?? '',
-      year: json['year']?.toString() ?? '',
-      serverEpisodesCount: _asInt(json['serverEpisodesCount']),
+      id: json['id'] ?? 0,
+      title: json['title'] ?? '',
+      slug: json['slug'] ?? '',
+      poster: json['poster'] ?? '',
+      backdrop: json['backdrop'] ?? '',
+      episodes: json['episodes'] ?? 0,
+      country: json['country'] ?? '',
+      status: json['status'] ?? '',
+      rating: (json['rating'] ?? 0).toDouble(),
+      genres: List<String>.from(json['genres'] ?? []),
+      description: json['description'] ?? '',
+      duration: json['duration'] ?? '',
+      year: json['year'] ?? '',
+      serverEpisodesCount: json['serverEpisodesCount'] ?? 0,
     );
   }
 }

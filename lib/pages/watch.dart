@@ -3,83 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme/nipah_theme.dart';
 import '../widgets/nipah_loader.dart';
 import 'settings.dart';
-
-class _VlcPlayerWidget extends StatefulWidget {
-  final String url;
-  final String userAgent;
-  final String referer;
-  final VoidCallback? onInitialized;
-  final void Function(VlcPlayerController controller)? onControllerReady;
-  const _VlcPlayerWidget({
-    super.key,
-    required this.url,
-    this.userAgent = '',
-    this.referer = '',
-    this.onInitialized,
-    this.onControllerReady,
-  });
-  @override
-  State<_VlcPlayerWidget> createState() => _VlcPlayerWidgetState();
-}
-
-class _VlcPlayerWidgetState extends State<_VlcPlayerWidget> {
-  late final VlcPlayerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    final opts = <String>[
-      VlcHttpOptions.httpReconnect(true),
-      VlcHttpOptions.httpContinuous(true),
-    ];
-    if (widget.userAgent.isNotEmpty) {
-      opts.add(VlcHttpOptions.httpUserAgent(widget.userAgent));
-    }
-    if (widget.referer.isNotEmpty) {
-      opts.add(VlcHttpOptions.httpReferrer(widget.referer));
-    }
-
-    _controller = VlcPlayerController.network(
-      widget.url,
-      hwAcc: HwAcc.disabled,
-      autoPlay: true,
-      options: VlcPlayerOptions(
-        http: VlcHttpOptions(opts),
-        advanced: VlcAdvancedOptions([
-          VlcAdvancedOptions.networkCaching(5000),
-        ]),
-      ),
-    );
-
-    _controller.addOnInitListener(() {
-      widget.onControllerReady?.call(_controller);
-      widget.onInitialized?.call();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.stopRendererScanning();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return VlcPlayer(
-      controller: _controller,
-      aspectRatio: MediaQuery.of(context).size.aspectRatio,
-      placeholder: const Center(child: NipahLoader(size: 28)),
-    );
-  }
-}
 
 class WatchPage extends StatefulWidget {
   final String animeTitle;
@@ -102,10 +31,6 @@ class WatchPage extends StatefulWidget {
 class _WatchPageState extends State<WatchPage> {
   late final Player _player;
   late final VideoController _videoController;
-  VlcPlayerController? _vlcController;
-  bool _useVlc = false;
-  bool _vlcError = false;
-  Timer? _vlcFallbackTimer;
   bool _isInitializing = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -121,16 +46,10 @@ class _WatchPageState extends State<WatchPage> {
   Duration _savedPosition = Duration.zero;
   bool _showResumeDialog = false;
   String _preferredQuality = 'Auto';
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  String? _vlcUrl;
 
   String get _positionKey => '${widget.anilistId}_ep${_currentEpisode}';
 
   Duration _lastSavedPosition = Duration.zero;
-
-  int _mkErrorCount = 0;
-  final List<StreamSubscription> _subscriptions = [];
 
   @override
   void initState() {
@@ -142,12 +61,10 @@ class _WatchPageState extends State<WatchPage> {
     WakelockPlus.enable();
     _applyAutoRotate();
 
-    _subscriptions.add(_player.stream.playing.listen((playing) {
-      if (mounted && !_useVlc) {
+    _player.stream.playing.listen((playing) {
+      if (mounted) {
         setState(() => _isPlaying = playing);
         if (playing) {
-          _mkErrorCount = 0;
-          _vlcFallbackTimer?.cancel();
           _resetHideTimer();
         } else {
           _hideTimer?.cancel();
@@ -155,49 +72,25 @@ class _WatchPageState extends State<WatchPage> {
           _saveCurrentPosition();
         }
       }
-    }));
+    });
 
-    _subscriptions.add(_player.stream.position.listen((position) {
-      if (mounted && !_useVlc) {
-        setState(() => _position = position);
-        if (_isPlaying && position.inSeconds > 2) {
-          _lastSavedPosition = position;
-          if (position.inSeconds % 5 == 0) {
-            final dur = _player.state.duration;
-            if (dur.inSeconds > 5) {
-              savePlaybackPosition(_positionKey, position, dur);
-            }
+    _player.stream.position.listen((position) {
+      if (mounted && _isPlaying && position.inSeconds > 2) {
+        _lastSavedPosition = position;
+        if (position.inSeconds % 5 == 0) {
+          final dur = _player.state.duration;
+          if (dur.inSeconds > 5) {
+            savePlaybackPosition(_positionKey, position, dur);
           }
         }
       }
-    }));
+    });
 
-    _subscriptions.add(_player.stream.duration.listen((duration) {
-      if (mounted && !_useVlc) setState(() => _duration = duration);
-    }));
-
-    _subscriptions.add(_player.stream.completed.listen((completed) {
+    _player.stream.completed.listen((completed) {
       if (completed && mounted) {
         clearPlaybackPosition(_positionKey);
       }
-    }));
-
-    _subscriptions.add(_player.stream.error.listen((error) {
-      if (mounted && error.isNotEmpty && !_useVlc) {
-        _mkErrorCount++;
-        debugPrint('Watch: MK stream error (count=$_mkErrorCount): $error');
-        if (_mkErrorCount >= 3) {
-          _vlcFallbackTimer?.cancel();
-          debugPrint('Watch: 3+ errors, switching to VLC');
-          _useVlc = true;
-          if (_sources.isNotEmpty && _selectedSourceIndex < _sources.length) {
-            final source = _sources[_selectedSourceIndex];
-            final url = _selectedLinkIndex < source.links.length ? source.links[_selectedLinkIndex].url : '';
-            if (url.isNotEmpty) _initVlcPlayer(url, source);
-          }
-        }
-      }
-    }));
+    });
 
     _init();
   }
@@ -224,17 +117,10 @@ class _WatchPageState extends State<WatchPage> {
 
   @override
   void dispose() {
-    for (final sub in _subscriptions) {
-      sub.cancel();
-    }
     _hideTimer?.cancel();
     _positionSaveTimer?.cancel();
-    _vlcFallbackTimer?.cancel();
     _saveCurrentPosition();
     _player.dispose();
-    _vlcController?.removeListener(_vlcListener);
-    _vlcController?.stopRendererScanning();
-    _vlcController?.dispose();
     WakelockPlus.disable();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -260,15 +146,8 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   void _saveCurrentPosition() {
-    Duration pos;
-    Duration dur;
-    if (_useVlc && _vlcController != null) {
-      pos = _vlcController!.value.position;
-      dur = _vlcController!.value.duration;
-    } else {
-      pos = _player.state.position;
-      dur = _player.state.duration;
-    }
+    final pos = _player.state.position;
+    final dur = _player.state.duration;
     final savePos = pos.inSeconds > 2 ? pos : _lastSavedPosition;
     if (savePos.inSeconds > 2 && dur.inSeconds > 5) {
       savePlaybackPosition(_positionKey, savePos, dur);
@@ -289,27 +168,18 @@ class _WatchPageState extends State<WatchPage> {
     final target = _savedPosition;
     _savedPosition = Duration.zero;
     _startPositionSaveTimer();
-    if (_useVlc) {
-      _vlcController?.play();
-      if (target.inSeconds > 0) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _vlcController?.seekTo(target);
-        });
-      }
-    } else {
-      _player.play();
-      if (target.inSeconds > 0) {
-        StreamSubscription? sub;
-        sub = _player.stream.position.listen((_) {
-          if (mounted) {
-            _player.seek(target);
-            sub?.cancel();
-          }
-        });
-        Future.delayed(const Duration(seconds: 10), () {
-          if (mounted) sub?.cancel();
-        });
-      }
+    _player.play();
+    if (target.inSeconds > 0) {
+      StreamSubscription? sub;
+      sub = _player.stream.position.listen((_) {
+        if (mounted) {
+          _player.seek(target);
+          sub?.cancel();
+        }
+      });
+      Future.delayed(const Duration(seconds: 10), () {
+        if (mounted) sub?.cancel();
+      });
     }
   }
 
@@ -318,11 +188,7 @@ class _WatchPageState extends State<WatchPage> {
     setState(() {
       _showResumeDialog = false;
     });
-    if (_useVlc) {
-      _vlcController?.play();
-    } else {
-      _player.play();
-    }
+    _player.play();
     _startPositionSaveTimer();
   }
 
@@ -366,13 +232,10 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   Future<void> _loadStream() async {
-    _vlcFallbackTimer?.cancel();
     setState(() {
       _isInitializing = true;
       _hasError = false;
       _historySaved = false;
-      _useVlc = false;
-      _vlcError = false;
     });
 
     final titleVariants = widget.anime?.allTitles;
@@ -389,13 +252,10 @@ class _WatchPageState extends State<WatchPage> {
       }
 
       if (sources.isEmpty || (sources.length == 1 && sources.first.server == 'Unavailable')) {
-        final msg = sources.isNotEmpty && sources.first.links.isNotEmpty
-            ? sources.first.links.first.quality
-            : 'No streaming sources found.';
         setState(() {
           _isInitializing = false;
           _hasError = true;
-          _errorMessage = msg;
+          _errorMessage = sources.isNotEmpty ? sources.first.links.first.quality : 'No streaming sources found.';
         });
         return;
       }
@@ -419,11 +279,6 @@ class _WatchPageState extends State<WatchPage> {
         _hasError = true;
         _errorMessage = 'This source is not available.';
       });
-      return;
-    }
-
-    if (_useVlc) {
-      _initVlcPlayer(url, source);
       return;
     }
 
@@ -451,100 +306,12 @@ class _WatchPageState extends State<WatchPage> {
       }
       _resetHideTimer();
       _saveWatchHistory();
-      if (!_useVlc) _startVlcFallbackTimer(url, source);
     } catch (e) {
-      debugPrint('Watch: MK failed to open $url - $e, trying VLC');
-      if (!_useVlc) {
-        _useVlc = true;
-        _initVlcPlayer(url, source);
-      } else {
-        setState(() {
-          _isInitializing = false;
-          _hasError = true;
-          _errorMessage = 'Failed to load video: $e';
-        });
-      }
-    }
-  }
-
-  void _startVlcFallbackTimer(String url, StreamSource source) {
-    _vlcFallbackTimer?.cancel();
-    _vlcFallbackTimer = Timer(const Duration(seconds: 4), () {
-      if (!mounted || _useVlc) return;
-      final pos = _player.state.position;
-      final dur = _player.state.duration;
-      if (pos.inSeconds < 2 && dur.inSeconds < 2) {
-        debugPrint('Watch: MK no progress after 4s, switching to VLC');
-        _useVlc = true;
-        _initVlcPlayer(url, source);
-      }
-    });
-  }
-
-  void _initVlcPlayer(String url, StreamSource source) {
-    _vlcController?.removeListener(_vlcListener);
-    _vlcController?.stopRendererScanning();
-    _vlcController?.dispose();
-    _vlcController = null;
-
-    setState(() {
-      _vlcUrl = url;
-      _isInitializing = false;
-      _showControls = true;
-    });
-    if (_showResumeDialog) {
       setState(() {
-        _isPlaying = false;
-        _showControls = true;
+        _isInitializing = false;
+        _hasError = true;
+        _errorMessage = 'Failed to load video: $e';
       });
-    } else {
-      _isPlaying = true;
-      _startPositionSaveTimer();
-    }
-    _resetHideTimer();
-    _saveWatchHistory();
-  }
-
-  void _onVlcReady(VlcPlayerController ctrl) {
-    _vlcController = ctrl;
-    ctrl.addListener(_vlcListener);
-    debugPrint('Watch: VLC player ready');
-  }
-
-  void _vlcListener() {
-    if (!mounted || _vlcController == null) return;
-    final v = _vlcController!.value;
-
-    if (mounted) {
-      setState(() {
-        _isPlaying = v.isPlaying;
-        _position = v.position;
-        _duration = v.duration;
-      });
-    }
-
-    if (v.isPlaying) {
-      _resetHideTimer();
-    } else if (!_isPlaying) {
-      _hideTimer?.cancel();
-      if (_showControls == false) setState(() => _showControls = true);
-      _saveCurrentPosition();
-    }
-
-    if (_isPlaying && _position.inSeconds > 2) {
-      _lastSavedPosition = _position;
-      if (_position.inSeconds % 5 == 0 && _duration.inSeconds > 5) {
-        savePlaybackPosition(_positionKey, _position, _duration);
-      }
-    }
-
-    if (v.isEnded && mounted) {
-      clearPlaybackPosition(_positionKey);
-    }
-
-    if (v.hasError && mounted && !_vlcError) {
-      _vlcError = true;
-      debugPrint('Watch: VLC error: ${v.errorDescription}');
     }
   }
 
@@ -556,44 +323,26 @@ class _WatchPageState extends State<WatchPage> {
       'episode': _currentEpisode,
       'anilistId': widget.anilistId,
       'coverImage': widget.anime?.coverImage ?? '',
-      'server': _sources.isNotEmpty && _selectedSourceIndex < _sources.length ? _sources[_selectedSourceIndex].server : '',
+      'server': _sources.isNotEmpty ? _sources[_selectedSourceIndex].server : '',
       'watchedAt': DateTime.now().millisecondsSinceEpoch,
     });
   }
 
   void _togglePlayPause() {
-    if (_useVlc) {
-      final v = _vlcController?.value;
-      if (v != null && v.isPlaying) {
-        _vlcController?.pause();
-      } else {
-        _vlcController?.play();
-      }
-    } else {
-      _player.playOrPause();
-    }
+    _player.playOrPause();
     _showControlsBriefly();
   }
 
   void _seekForward() {
-    final newPos = _position + const Duration(seconds: 10);
-    if (_useVlc) {
-      _vlcController?.seekTo(newPos);
-    } else {
-      _player.seek(newPos);
-    }
+    final pos = _player.state.position;
+    _player.seek(pos + const Duration(seconds: 10));
     _showControlsBriefly();
   }
 
   void _seekBackward() {
-    final pos = _position;
+    final pos = _player.state.position;
     final newPos = pos - const Duration(seconds: 10);
-    final target = newPos < Duration.zero ? Duration.zero : newPos;
-    if (_useVlc) {
-      _vlcController?.seekTo(target);
-    } else {
-      _player.seek(target);
-    }
+    _player.seek(newPos < Duration.zero ? Duration.zero : newPos);
     _showControlsBriefly();
   }
 
@@ -742,8 +491,6 @@ class _WatchPageState extends State<WatchPage> {
   void _changeEpisode(int delta) {
     final newEp = _currentEpisode + delta;
     if (newEp < 1) return;
-    _saveCurrentPosition();
-    _positionSaveTimer?.cancel();
     setState(() => _currentEpisode = newEp);
     _loadStream();
   }
@@ -917,15 +664,6 @@ class _WatchPageState extends State<WatchPage> {
         ),
       );
     }
-    if (_useVlc && _vlcUrl != null) {
-      return _VlcPlayerWidget(
-        key: ValueKey(_vlcUrl),
-        url: _vlcUrl!,
-        userAgent: _defaultUA,
-        referer: 'https://www2.animeheaven.ru/',
-        onControllerReady: _onVlcReady,
-      );
-    }
     return Video(
       controller: _videoController,
       controls: NoVideoControls,
@@ -979,29 +717,14 @@ class _WatchPageState extends State<WatchPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Row(
-                    children: [
-                      Text(
-                        '${L10n.t('episode')} $_currentEpisode',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
-                      ),
-                      if (_useVlc) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: NipahColors.gold.withValues(alpha: 0.2),
-                            border: Border.all(color: NipahColors.gold.withValues(alpha: 0.4)),
-                          ),
-                          child: Text('VLC', style: NipahTheme.label(size: 8, color: NipahColors.gold)),
-                        ),
-                      ],
-                    ],
+                  Text(
+                '${L10n.t('episode')} $_currentEpisode',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
                   ),
                 ],
               ),
             ),
-            if (_sources.isNotEmpty && _selectedSourceIndex < _sources.length && _sources.first.server != 'Unavailable')
+            if (_sources.isNotEmpty && _sources.first.server != 'Unavailable')
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -1073,6 +796,9 @@ class _WatchPageState extends State<WatchPage> {
   }
 
   Widget _buildBottomBar() {
+    final position = _player.state.position;
+    final duration = _player.state.duration;
+
     return SafeArea(
       child: GestureDetector(
         onTap: () {},
@@ -1090,17 +816,12 @@ class _WatchPageState extends State<WatchPage> {
                   overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
                 ),
                 child: Slider(
-                  value: _duration.inMilliseconds > 0
-                      ? _position.inMilliseconds.toDouble().clamp(0.0, _duration.inMilliseconds.toDouble())
+                  value: duration.inMilliseconds > 0
+                      ? position.inMilliseconds.toDouble().clamp(0.0, duration.inMilliseconds.toDouble())
                       : 0.0,
-                  max: _duration.inMilliseconds > 0 ? _duration.inMilliseconds.toDouble() : 1.0,
+                  max: duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0,
                   onChanged: (value) {
-                    final target = Duration(milliseconds: value.toInt());
-                    if (_useVlc) {
-                      _vlcController?.seekTo(target);
-                    } else {
-                      _player.seek(target);
-                    }
+                    _player.seek(Duration(milliseconds: value.toInt()));
                     _showControlsBriefly();
                   },
                 ),
@@ -1108,7 +829,7 @@ class _WatchPageState extends State<WatchPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(_formatDuration(_position), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  Text(_formatDuration(position), style: const TextStyle(color: Colors.white, fontSize: 12)),
                   Row(
                     children: [
                       IconButton(
@@ -1125,7 +846,7 @@ class _WatchPageState extends State<WatchPage> {
                       ),
                     ],
                   ),
-                  Text(_formatDuration(_duration), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  Text(_formatDuration(duration), style: const TextStyle(color: Colors.white, fontSize: 12)),
                 ],
               ),
             ],

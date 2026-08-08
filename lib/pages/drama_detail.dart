@@ -24,24 +24,13 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
     _loadDetail();
   }
 
-  String? _loadError;
-
   Future<void> _loadDetail() async {
-    try {
-      final epData = await getDramaEpisodes(widget.drama.id);
-      if (mounted) {
-        setState(() {
-          _episodeData = epData;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadError = e.toString();
-          _isLoading = false;
-        });
-      }
+    final epData = await getDramaEpisodes(widget.drama.id);
+    if (mounted) {
+      setState(() {
+        _episodeData = epData;
+        _isLoading = false;
+      });
     }
   }
 
@@ -96,12 +85,10 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                           width: 80,
                           height: 120,
                           decoration: BoxDecoration(
-                            color: NipahColors.surface2,
-                          ),
-                          child: CachedNetworkImage(
-                            imageUrl: drama.poster,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Icon(Icons.broken_image, color: NipahColors.textDim, size: 32),
+                            image: DecorationImage(
+                              image: CachedNetworkImageProvider(drama.poster),
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       const SizedBox(width: 16),
@@ -151,21 +138,6 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                   const SizedBox(height: 24),
                   if (_isLoading)
                     const Center(child: NipahLoader(size: 28))
-                  else if (_loadError != null)
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Failed to load episodes', style: NipahTheme.body(size: 14, color: NipahColors.danger)),
-                          const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: () { setState(() { _isLoading = true; _loadError = null; _loadDetail(); });
-                            },
-                            child: Text('Retry', style: NipahTheme.body(size: 13, color: NipahColors.gold)),
-                          ),
-                        ],
-                      ),
-                    )
                   else if (_episodeData != null && _episodeData!.episodes.isNotEmpty)
                     _buildEpisodeList()
                   else
@@ -183,113 +155,53 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
 
   Widget _buildEpisodeList() {
     final episodes = _episodeData!.episodes;
-    final useGrid = episodes.length > 30;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Episodes (${episodes.length})', style: NipahTheme.heading(size: 16)),
         const SizedBox(height: 12),
-        if (useGrid)
-          _buildGrid(episodes)
-        else
-          _buildList(episodes),
-      ],
-    );
-  }
-
-  Widget _buildGrid(List<DramaEpisode> episodes) {
-    final width = MediaQuery.of(context).size.width;
-    final crossCount = width > 600 ? 8 : (width > 400 ? 6 : 5);
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossCount,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-      ),
-      itemCount: episodes.length,
-      itemBuilder: (context, index) {
-        final ep = episodes[index];
-        return GestureDetector(
-          onTap: () => _playEpisode(ep.number),
-          child: Container(
-            decoration: BoxDecoration(
-              color: NipahColors.surface2,
-              border: Border.all(color: NipahColors.lineSoft),
-            ),
-            child: Center(
-              child: Text(
-                '${ep.number}',
-                style: NipahTheme.heading(size: 16, color: NipahColors.gold),
-              ),
-            ),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 5,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildList(List<DramaEpisode> episodes) {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: episodes.length,
-      separatorBuilder: (_, __) => Container(height: 1, color: NipahColors.lineSoft),
-      itemBuilder: (context, index) {
-        final ep = episodes[index];
-        return GestureDetector(
-          onTap: () => _playEpisode(ep.number),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            color: NipahColors.surface,
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [NipahColors.gold, NipahColors.goldStrong],
+          itemCount: episodes.length,
+          itemBuilder: (context, index) {
+            final ep = episodes[index];
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DramaWatchPage(
+                      title: widget.drama.title,
+                      episode: ep.number,
+                      mediaId: widget.drama.id,
+                      episodes: episodes,
+                      coverImage: widget.drama.poster,
                     ),
                   ),
-                  child: Center(
-                    child: Text(
-                      '${ep.number}',
-                      style: NipahTheme.label(size: 11, color: NipahColors.bg),
-                    ),
-                  ),
+                );
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: NipahColors.surface2,
+                  border: Border.all(color: NipahColors.lineSoft),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+                child: Center(
                   child: Text(
-                    'Episode ${ep.number}',
-                    style: NipahTheme.body(size: 14, color: NipahColors.text),
+                    '${ep.number}',
+                    style: NipahTheme.heading(size: 16, color: NipahColors.gold),
                   ),
                 ),
-                Icon(Icons.play_circle_outline, color: NipahColors.gold, size: 22),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _playEpisode(int number) {
-    if (_episodeData == null || _episodeData!.episodes.isEmpty) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => DramaWatchPage(
-          title: widget.drama.title,
-          episode: number,
-          mediaId: widget.drama.id,
-          episodes: _episodeData!.episodes,
-          coverImage: widget.drama.poster,
+              ),
+            );
+          },
         ),
-      ),
+      ],
     );
   }
 }

@@ -36,12 +36,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   final Map<int, bool> _dramaTabLoading = {};
   final Map<int, bool> _dramaTabLoaded = {};
 
-  // Country filter
-  static const _dramaCountries = ['Japanese', 'Chinese', 'Korean', 'English', 'Thai', 'Filipino'];
-  String? _selectedCountry;
-  List<Drama> _countryDramas = [];
-  bool _countryLoading = false;
-
   @override
   void initState() {
     super.initState();
@@ -79,19 +73,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Future<void> _loadAnimeTab(int index) async {
     if (_tabLoaded[index] == true) return;
-    if (!mounted) return;
     setState(() => _tabLoading[index] = true);
     try {
       List<Anime> data;
       switch (index) {
         case 0:
-          data = await getNewFinishedAnime();
+          data = await getAiringSchedule();
           break;
         case 1:
-          data = await getRecentEpisodes();
+          data = await getTopAnime();
           break;
         case 2:
-          data = await getAiringSchedule();
+          data = await getRecentEpisodes();
           break;
         default:
           data = [];
@@ -119,19 +112,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Future<void> _loadDramaTab(int index) async {
     if (_dramaTabLoaded[index] == true) return;
-    if (!mounted) return;
     setState(() => _dramaTabLoading[index] = true);
     try {
       List<Drama> data;
       switch (index) {
         case 0:
-          data = await getNewDramas();
+          data = await getPopularDramas();
           break;
         case 1:
           data = await getRecentDramas();
           break;
         case 2:
-          data = await getAiringDramas();
+          data = await getNewDramas();
           break;
         default:
           data = [];
@@ -157,33 +149,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
-  Future<void> _loadCountryDramas(String country) async {
-    setState(() => _countryLoading = true);
-    try {
-      final data = await getDramasByCountry(country);
-      if (mounted) {
-        setState(() {
-          _countryDramas = data;
-          _countryLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _countryLoading = false);
-    }
-  }
-
-  void _onCountryTap(String country) {
-    if (_selectedCountry == country) {
-      setState(() => _selectedCountry = null);
-    } else {
-      setState(() {
-        _selectedCountry = country;
-        _countryDramas = [];
-      });
-      _loadCountryDramas(country);
-    }
-  }
-
   void _startHeroTimer() {
     _heroTimer?.cancel();
     _heroTimer = Timer.periodic(const Duration(seconds: 6), (_) {
@@ -206,13 +171,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Future<void> _onRefresh() async {
-    _heroTimer?.cancel();
     _tabLoaded.clear();
     _dramaTabLoaded.clear();
     _heroAnime = [];
     _heroDramas = [];
     _heroIndex = 0;
-    if (_heroPageController.hasClients) _heroPageController.jumpToPage(0);
     await _loadTab(_tabController.index);
   }
 
@@ -613,94 +576,48 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildTabBar() {
+    final isDrama = _appMode == 'drama';
     return Container(
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: NipahColors.lineSoft)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            indicatorColor: NipahColors.gold,
-            indicatorWeight: 2,
-            labelColor: NipahColors.goldStrong,
-            unselectedLabelColor: NipahColors.textDim,
-            labelStyle: NipahTheme.label(size: 12, letterSpacing: 0.12),
-            unselectedLabelStyle: NipahTheme.label(
-              size: 12,
-              color: NipahColors.textDim,
-              letterSpacing: 0.12,
-            ),
-            dividerColor: Colors.transparent,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            tabs: [
-              Tab(text: L10n.t('newDramas')),
-              Tab(text: L10n.t('recent')),
-              Tab(text: L10n.t('airing')),
-            ],
-          ),
-          if (_appMode == 'drama')
-            Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _dramaCountries.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final country = _dramaCountries[index];
-                  final isSelected = _selectedCountry == country;
-                  return GestureDetector(
-                    onTap: () => _onCountryTap(country),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        gradient: isSelected
-                            ? LinearGradient(colors: [NipahColors.gold, NipahColors.goldStrong])
-                            : null,
-                        color: isSelected ? null : NipahColors.surface2,
-                        border: Border.all(
-                          color: isSelected ? NipahColors.gold : NipahColors.lineSoft,
-                        ),
-                      ),
-                      child: Text(
-                        country,
-                        style: NipahTheme.label(
-                          size: 11,
-                          color: isSelected ? NipahColors.bg : NipahColors.textDim,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+      child: TabBar(
+        controller: _tabController,
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        indicatorColor: NipahColors.gold,
+        indicatorWeight: 2,
+        labelColor: NipahColors.goldStrong,
+        unselectedLabelColor: NipahColors.textDim,
+        labelStyle: NipahTheme.label(size: 12, letterSpacing: 0.12),
+        unselectedLabelStyle: NipahTheme.label(
+          size: 12,
+          color: NipahColors.textDim,
+          letterSpacing: 0.12,
+        ),
+        dividerColor: Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        tabs: [
+          Tab(text: isDrama ? L10n.t('popular') : L10n.t('schedule')),
+          Tab(text: isDrama ? L10n.t('recent') : L10n.t('top')),
+          Tab(text: isDrama ? L10n.t('newDramas') : L10n.t('latest')),
         ],
       ),
     );
   }
 
   Widget _buildSectionHeader() {
+    final isDrama = _appMode == 'drama';
+    final labels = isDrama ? [L10n.t('popular'), L10n.t('recent'), L10n.t('newDramas')] : [L10n.t('schedule'), L10n.t('top'), L10n.t('latest')];
     final idx = _tabController.index;
-    final labels = [L10n.t('newDramas'), L10n.t('recent'), L10n.t('airing')];
-    final countryLabel = _selectedCountry ?? '';
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _selectedCountry != null ? countryLabel : labels[idx],
-            style: NipahTheme.label(size: 11),
-          ),
+          Text(labels[idx], style: NipahTheme.label(size: 11)),
           const SizedBox(height: 2),
-          Text(
-            _selectedCountry != null ? 'Dramas from $countryLabel' : labels[idx],
-            style: NipahTheme.body(size: 12, color: NipahColors.textDim),
-          ),
+          Text(labels[idx], style: NipahTheme.body(size: 12, color: NipahColors.textDim)),
         ],
       ),
     );
@@ -760,10 +677,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildDramaTabContent(int index) {
-    if (_selectedCountry != null) {
-      return _buildCountryDramaContent();
-    }
-
     final isLoading = _dramaTabLoading[index] ?? true;
     final data = _dramaTabData[index] ?? [];
 
@@ -790,29 +703,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       );
     }
 
-    return _buildDramaGrid(data);
-  }
-
-  Widget _buildCountryDramaContent() {
-    if (_countryLoading) return _buildShimmerGrid();
-
-    if (_countryDramas.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.language, size: 56, color: NipahColors.textDim),
-            const SizedBox(height: 12),
-            Text('No dramas found', style: NipahTheme.body(size: 15, color: NipahColors.textDim)),
-          ],
-        ),
-      );
-    }
-
-    return _buildDramaGrid(_countryDramas);
-  }
-
-  Widget _buildDramaGrid(List<Drama> data) {
     return GridView.builder(
       padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
