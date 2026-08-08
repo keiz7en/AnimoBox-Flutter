@@ -100,8 +100,60 @@ Latest release: [v5.1.4](https://github.com/keiz7en/AnimoBox-Flutter/releases/la
 
 ---
 
-## License
+## License & Legal
 
-Proprietary. All rights reserved.
+### Proprietary License
+**LimeSugar** is proprietary software. All rights reserved.
+
+**Copyright © 2024-2025 LimeSugar. All rights reserved.**
+
+This software and its associated documentation are protected by copyright law and international treaties. Unauthorized reproduction, distribution, modification, reverse engineering, or creation of derivative works is strictly prohibited.
+
+### Disclaimer of Warranties
+**THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.**
+
+The authors and copyright holders make no representations or warranties about:
+- The accuracy, completeness, or reliability of content accessed through this application
+- The availability, continuity, or performance of streaming services
+- The legality of content in your jurisdiction
+- Freedom from viruses, malware, or other harmful components
+
+### Limitation of Liability
+**IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.**
+
+This includes but is not limited to:
+- Direct, indirect, incidental, or consequential damages
+- Loss of data, profits, or business opportunities
+- Legal fees or costs arising from use of the application
+- Any issues related to third-party content, links, or services
+
+### Third-Party Content
+This application aggregates and provides access to publicly available streaming links. **We do not host, store, upload, or control any video content.** All videos are streamed from third-party sources. We are not responsible for:
+- Content availability, quality, or legality
+- Copyright status of third-party content
+- Changes to external APIs or streaming endpoints
+- Geographic restrictions or regional blocking
+
+### User Responsibility
+By using this application, you agree to:
+- Comply with all applicable laws in your jurisdiction
+- Respect intellectual property rights of content creators
+- Use the application for personal, non-commercial purposes only
+- Not attempt to circumvent any access controls or protection measures
+
+### No Affiliation
+**LimeSugar is not affiliated with, endorsed by, or connected to any streaming service, content provider, or platform** whose content may be accessible through this application. All trademarks, service marks, and trade names referenced are the property of their respective owners.
+
+### Updates & Termination
+We reserve the right to modify, suspend, or discontinue the application (or any part thereof) at any time without notice. We are not liable for any interruption or cessation of service.
+
+### Governing Law
+This license shall be governed by and construed in accordance with applicable laws. Any disputes arising from use of this software shall be subject to the exclusive jurisdiction of the competent courts.
+
+---
+
+**By downloading, installing, or using LimeSugar, you acknowledge that you have read, understood, and agree to these terms.**
+
+---
 
 **LimeSugar** — Stream smart. Watch anywhere.
