@@ -57,8 +57,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   int _tryLinkIndex = 0;
   bool _isRetrying = false;
   String _lastFailedUrl = '';
-  bool _vlcChecked = false;
-  bool _vlcInstalled = false;
 
   String get _positionKey => '${widget.mediaId}_drama_ep${_currentEpisode}';
 
@@ -111,18 +109,8 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
   }
 
   Future<void> _init() async {
-    await _checkVlc();
     await _loadSavedPosition();
     _loadStream();
-  }
-
-  Future<void> _checkVlc() async {
-    try {
-      _vlcInstalled = await canLaunchUrl(Uri.parse('vlc://test'));
-    } catch (_) {
-      _vlcInstalled = false;
-    }
-    _vlcChecked = true;
   }
 
   Future<void> _applyAutoRotate() async {
@@ -308,11 +296,6 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
           _lastFailedUrl = lastUrl;
           _errorMessage = 'All servers unavailable. The streaming CDN may be down.';
         });
-        if (lastUrl.isNotEmpty && _vlcInstalled) {
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) _openInExternalPlayer();
-          });
-        }
       }
       return;
     }
@@ -396,27 +379,21 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
 
   Future<void> _openInExternalPlayer() async {
     if (_lastFailedUrl.isEmpty) return;
-    if (_vlcInstalled) {
-      final vlcUri = Uri.parse('vlc://${_lastFailedUrl}');
-      if (await canLaunchUrl(vlcUri)) {
-        await launchUrl(vlcUri);
-        return;
-      }
-    }
-    final genericUri = Uri.parse(_lastFailedUrl);
-    if (await canLaunchUrl(genericUri)) {
-      await launchUrl(genericUri, mode: LaunchMode.externalApplication);
-    }
+    try {
+      await launchUrl(
+        Uri.parse(_lastFailedUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {}
   }
 
   Future<void> _openVlcPlayStore() async {
-    final storeUri = Uri.parse('market://details?id=org.videolan.vlc');
-    if (await canLaunchUrl(storeUri)) {
-      await launchUrl(storeUri);
-    } else {
-      final webUri = Uri.parse('https://play.google.com/store/apps/details?id=org.videolan.vlc');
-      await launchUrl(webUri);
-    }
+    try {
+      await launchUrl(
+        Uri.parse('https://play.google.com/store/apps/details?id=org.videolan.vlc'),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {}
   }
 
   void _switchServer(int sourceIndex) {
@@ -502,7 +479,7 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                         const SizedBox(height: 16),
                         Text(_errorMessage, style: NipahTheme.body(size: 14, color: NipahColors.textDim), textAlign: TextAlign.center),
                         const SizedBox(height: 24),
-                        if (_lastFailedUrl.isNotEmpty && _vlcInstalled)
+                        if (_lastFailedUrl.isNotEmpty)
                           GestureDetector(
                             onTap: _openInExternalPlayer,
                             child: Container(
@@ -515,31 +492,12 @@ class _DramaWatchPageState extends State<DramaWatchPage> {
                                 children: [
                                   Icon(Icons.open_in_new, color: NipahColors.bg, size: 16),
                                   const SizedBox(width: 8),
-                                  Text('Open in VLC', style: NipahTheme.label(size: 12, color: NipahColors.bg)),
+                                  Text('Open in Video Player', style: NipahTheme.label(size: 12, color: NipahColors.bg)),
                                 ],
                               ),
                             ),
                           ),
-                        if (_lastFailedUrl.isNotEmpty && _vlcInstalled) const SizedBox(height: 12),
-                        if (_lastFailedUrl.isNotEmpty && !_vlcInstalled)
-                          GestureDetector(
-                            onTap: _openVlcPlayStore,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              decoration: NipahTheme.goldButtonDecoration,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.download, color: NipahColors.bg, size: 16),
-                                  const SizedBox(width: 8),
-                                  Text('Install VLC to play', style: NipahTheme.label(size: 12, color: NipahColors.bg)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        if (_lastFailedUrl.isNotEmpty && !_vlcInstalled) const SizedBox(height: 12),
+                        if (_lastFailedUrl.isNotEmpty) const SizedBox(height: 12),
                         GestureDetector(
                           onTap: _loadStream,
                           child: Container(
